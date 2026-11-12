@@ -1,0 +1,48 @@
+# Terraform. This block is the same in every repository that carries Terraform
+# (jerryaswell/terraform_infrastructure#119, C12); what follows it is this
+# repository's own.
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+crash.log
+crash.*.log
+
+# Variable files. terraform.tfvars is the committed exception: it holds this
+# configuration's non-secret inputs, so a pull request's plan shows them.
+# Secrets reach Terraform as TF_VAR_* from repository secrets instead.
+*.tfvars
+*.tfvars.json
+!terraform.tfvars
+
+# .terraform.lock.hcl is deliberately not ignored: it pins provider hashes and
+# must be committed so CI resolves the same versions as local runs.
+
+# `checkov -o sarif`, which the checkov action runs, writes results.sarif into
+# the working directory.
+results.sarif
+
+# The copy of the workflows that `tf-scan` scans (.checkov.yml), when it is made
+# locally to run `checkov -d .` as CI does.
+checkov-workflows/
+
+# ---- This repository ----
+
+# Node / Vite
+node_modules/
+dist/
+site.zip
+
+# Backend build + Lambda packaging
+backend.zip
+modules/aws/lambda/placeholder.zip
+
+# Local env
+.env
+.env.local

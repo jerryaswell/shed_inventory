@@ -1,0 +1,638 @@
+name: Deploy
+
+# Only when dispatched, never on a push or a pull request, so Actions minutes
+# are spent only on a run the owner asked for (CLAUDE.md, "GitHub Actions: on
+# dispatch only"). Each run builds and tests the site and the backend, and
+# scans and plans the Terraform. A run on main then applies and ships; a run
+# on any other branch changes nothing live, and its write-role assume would
+# fail at the credentials step anyway (terraform_infrastructure pins the
+# write role to environment:aws-infra on main).
+on:
+  workflow_dispatch:
+
+# None at the top: every job declares what it uses
+# (jerryaswell/terraform_infrastructure#119, C5).
+permissions: {}
+
+# No job touches the Actions cache unless it says so: a restored entry is
+# unverified and extracted with `tar -P`. The cache service enforces the mode.
+cache-mode: none
+
+env:
+  AWS_REGION: us-east-2
+  # The same version as terraform_infrastructure's and self_mgmt's CI: state
+  # written by a newer Terraform is not guaranteed readable by an older one.
+  # Dependabot does not move it.
+  TF_VERSION: "1.16.6"
+  # One role per job, by what it may do (terraform_infrastructure,
+  # modules/aws/iam). The write role trusts only environment:aws-infra on main,
+  # so `plan`, which runs any dispatched branch's code, cannot assume it.
+  TF_ROLE: gha-shed_inventory
+  TF_PLAN_ROLE: gha-shed_inventory-plan
+
+jobs:
+  # dist/, built once per run; `apply` ships these exact bytes and
+  # writes config.json beside them (site/src/core/config.js).
+  build:
+    name: build site
+    runs-on: ubuntu-latest
+    # A hung job otherwise runs to the 6-hour default.
+    timeout-minutes: 15
+    # The checkout's read only.
+    permissions:
+      contents: read
+    # The npm cache. A branch's entries land in its own scope; main never
+    # restores them.
+    cache-mode: write
+    # `apply` downloads this upload by its id, never by name.
+    outputs:
+      site-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Every installed lock entry carries a sha512 integrity and the
+      # registry's own tarball URL. `npm ci` installs an entry that has neither
+      # without a word, so this runs first, before anything is installed. Both
+      # files are checked here, and build-backend checks its own again.
+      - run: node scripts/check-lockfiles.js backend/package-lock.json package-lock.json
+      # No dependency's install script runs: none in the lock is needed on
+      # Linux. A package that comes to need one
+      # fails or misbuilds here, rather than running its script in the job
+      # that builds what ships.
+      - run: npm ci --ignore-scripts
+      # A known-vulnerable dependency fails review. `high`, so a moderate
+      # advisory in a dev dependency does not block a deploy.
+      - run: npm audit --audit-level=high
+      # One ESLint config covers site/, backend/ and scripts/: its only run.
+      - run: npm run lint
+      - run: npm test
+      # Every node:test file under scripts/ (Vitest's include is site/src only).
+      - run: npm run test:scripts
+      - run: npm run build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: upload
+        with:
+          name: site
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # The Lambda bundle, built and tested on every run. `apply` ships the zip
+  # through update-function-code, not Terraform.
+  build-backend:
+    name: build backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The checkout's read only, as `build` has.
+    permissions:
+      contents: read
+    # The npm cache, as `build` has.
+    cache-mode: write
+    # `apply` downloads this upload by its id, never by name.
+    outputs:
+      backend-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # As in `build`: the lock file is checked before anything is installed.
+      - run: node ../scripts/check-lockfiles.js package-lock.json
+      # No install script, as in `build`. esbuild's postinstall only finds the
+      # binary its optional platform package provides, links it over the JS
+      # shim and checks its version. The JS API the build calls finds the same
+      # binary without it: at the esbuild the lock file holds, the bundle is
+      # the same byte for byte. A bump that changed that would fail here, not
+      # ship a different bundle.
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=high
+      - run: npm test
+      - run: npm run build
+
+      - name: Package Lambda zip
+        run: |
+          set -euo pipefail
+          cd dist
+          zip -qr ../../backend.zip handler.mjs
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: upload
+        with:
+          name: backend
+          path: backend.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  # Checkov over the Terraform and the workflows (.checkov.yml), for insecure
+  # settings fmt and validate do not see. Its own job, without the AWS role: a
+  # third-party Docker action must not run where credentials are. A bump of its
+  # pin changes the image (the `image:` line of its action.yml): read it first.
+  tf-scan:
+    name: scan iac
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # Already the workflow default; set here too so it stays so.
+    cache-mode: none
+    steps:
+      # Nothing after the checkout runs git with credentials, so the token is
+      # not left under RUNNER_TEMP, where the container could read it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Checkov's github_actions framework drops, with no error, any workflow
+      # that fails the schema it vendors, and that schema has no workflow-level
+      # `cache-mode` and no `queue` under `concurrency`
+      # (jerryaswell/terraform_infrastructure#141). So this step copies each
+      # workflow that has either to its own path under `checkov-workflows/`,
+      # with each such pair's line left as a comment rather than deleted (a bare
+      # `#`, or the comment that followed the pair, such as a `checkov:skip`),
+      # so that a finding's line number matches the original, and the scan reads
+      # the copies too. Ruby's YAML parser, which the runner image carries,
+      # finds the pairs, so a line of a `run:` script or an input named `queue`
+      # is never touched. The step first refuses a file that parser and
+      # Checkov's loader could read differently: a document whose root is a
+      # sequence, a key that is not a scalar, a merge key (which GitHub does not
+      # support), or two keys in one mapping that load as the same value, as
+      # `on` and `yes` do. It then loads the original and the copy, aliases
+      # resolved, and fails unless the copy reads as the original without the
+      # two keys. So it fails, rather than let Checkov drop a file unseen, when
+      # a key is reached only through an alias it does not blank, when a pair is
+      # not alone on its line in a block mapping or carries an anchor, when a
+      # file it must blank has a line break other than LF or CRLF, and when
+      # blanking would change anything else. No Checkov check reads either key,
+      # so a copy is judged as its original would be. A workflow dropped for
+      # another reason is still dropped unseen (.checkov.yml). Not a dot
+      # directory, which Checkov skips. Drop this step once a Checkov release
+      # accepts both keys.
+      - name: Copy the workflows for checkov
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          rm -rf checkov-workflows
+          mkdir -p checkov-workflows/.github/workflows
+          files=(.github/workflows/*.yml .github/workflows/*.yaml)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::No workflow files to copy for checkov."
+            exit 1
+          fi
+          ruby - "${files[@]}" <<'RUBY'
+          require "date"
+          require "psych"
+
+          def pairs(node)
+            node.is_a?(Psych::Nodes::Mapping) ? node.children.each_slice(2).to_a : []
+          end
+
+          def value_of(node, key)
+            pairs(node).find { |k, _| k.is_a?(Psych::Nodes::Scalar) && k.value == key }&.last
+          end
+
+          # The pairs to blank, found in the parse tree: the workflow's cache-mode,
+          # and queue in the workflow's concurrency and in each job's.
+          def targets(root)
+            found = []
+            pick = lambda do |map, key|
+              pairs(map).each { |k, v| found << [map, k, v] if k.is_a?(Psych::Nodes::Scalar) && k.value == key }
+            end
+            pick.call(root, "cache-mode")
+            pick.call(value_of(root, "concurrency"), "queue")
+            pairs(value_of(root, "jobs")).each { |_, job| pick.call(value_of(job, "concurrency"), "queue") }
+            found
+          end
+
+          # Whether a node, or one inside it, is an alias or carries an anchor.
+          def tied?(node)
+            node.is_a?(Psych::Nodes::Alias) || (node.respond_to?(:anchor) && !node.anchor.nil?) ||
+              node.children.to_a.any? { |c| tied?(c) }
+          end
+
+          # A document as Psych loads it, aliases resolved. Only plain data and dates
+          # are built.
+          LOADER = Psych::ClassLoader::Restricted.new(%w[Date Time Symbol], [])
+          def data(doc)
+            Psych::Visitors::ToRuby.new(Psych::ScalarScanner.new(LOADER), LOADER).accept(doc)
+          end
+
+          # Loaded data rebuilt so that no hash or array sits in two places, as an
+          # alias puts it, so that a change in one place cannot show in another.
+          def unshare(x, open = {})
+            return x unless x.is_a?(Hash) || x.is_a?(Array)
+            raise ArgumentError, "an alias that contains itself" if open[x.object_id]
+            open[x.object_id] = true
+            y = x.is_a?(Hash) ? x.to_h { |k, v| [unshare(k, open), unshare(v, open)] } : x.map { |v| unshare(v, open) }
+            open.delete(x.object_id)
+            y
+          end
+
+          # Removes the two keys from loaded data, wherever Checkov's schema would
+          # meet them, and says whether there were any.
+          def strip!(doc)
+            return false unless doc.is_a?(Hash)
+            jobs = doc["jobs"].is_a?(Hash) ? doc["jobs"].values : []
+            places = [[doc, "cache-mode"], [doc["concurrency"], "queue"]]
+            jobs.each { |job| places << [job["concurrency"], "queue"] if job.is_a?(Hash) }
+            places.select { |map, key| map.is_a?(Hash) && map.key?(key) }.each { |map, key| map.delete(key) }.any?
+          end
+
+          MERGE = "tag:yaml.org,2002:merge"
+
+          # Every mapping node in a tree, each once.
+          def each_mapping(node, seen = {}, &blk)
+            return if node.nil? || seen[node.object_id]
+            seen[node.object_id] = true
+            blk.call(node) if node.is_a?(Psych::Nodes::Mapping)
+            node.children.to_a.each { |c| each_mapping(c, seen, &blk) }
+          end
+
+          # The first thing that Psych and Checkov's loader could read differently: a
+          # document whose root is a sequence, which Checkov reads as its first item,
+          # or, in any mapping, a key that is not a scalar, a merge key (GitHub
+          # supports none), or one that loads as the same value as an earlier key
+          # beside it, as `on` and `yes` both load as true here.
+          def unclear_key(stream)
+            stream.children.each do |doc|
+              return [doc.root, "a document whose root is a sequence (Checkov reads its first item as the workflow)"] if doc.root.is_a?(Psych::Nodes::Sequence)
+              each_mapping(doc) do |map|
+                seen = {}
+                pairs(map).each do |k, _|
+                  return [k, "a key that is not a scalar (an alias, a mapping or a sequence)"] unless k.is_a?(Psych::Nodes::Scalar)
+                  return [k, "a merge key (<<)"] if k.tag == MERGE || k.value == "<<"
+                  value = data(k)
+                  return [k, "two keys in one mapping that load as the same value"] if seen.key?(value)
+                  seen[value] = true
+                end
+              end
+            end
+            nil
+          end
+
+          def fail!(path, message, node = nil)
+            line = node ? ",line=#{node.start_line + 1}" : ""
+            puts "::error file=#{path}#{line}::#{message}"
+            exit 1
+          end
+
+          ARGV.each do |path|
+            text = File.read(path, mode: "r:BOM|UTF-8")
+            lines = text.lines
+            stream = Psych.parse_stream(text, filename: path)
+            key, what = unclear_key(stream)
+            if key
+              fail!(path, "This file has #{what}, which this step and Checkov's loader may read differently, so this step cannot check it, and Checkov might drop it unseen.", key)
+            end
+            # What the copy must read as: the original, as Psych loads it, without the two keys.
+            want = stream.children.map { |doc| unshare(data(doc)) }
+            had_keys = want.map { |doc| strip!(doc) }.any?
+            found = stream.children.flat_map { |doc| targets(doc.root) }
+            if found.empty?
+              if had_keys
+                fail!(path, "cache-mode or queue is reached only through an alias, which this step does not blank, so Checkov would drop this file.")
+              end
+              puts "#{path}: has neither key, so it is not copied."
+              next
+            end
+            if text.match?(/\r(?!\n)|[\u0085\u2028\u2029]/)
+              fail!(path, "This file has a line break other than LF or CRLF (a lone CR, NEL, LS or PS), which YAML counts and this step does not, so it cannot blank lines in it. Replace it with LF.")
+            end
+            found.each do |map, k, v|
+              line = lines[k.start_line]
+              rest = line[v.end_column..].to_s
+              in_block = map.style == Psych::Nodes::Mapping::BLOCK
+              on_one_line = k.start_line == v.end_line
+              nothing_before = line[0...k.start_column].strip.empty?
+              only_a_comment_after = rest.match?(/\A\s*(#.*)?\z/m)
+              unless in_block && on_one_line && nothing_before && only_a_comment_after
+                fail!(path, "#{k.value} is not alone on its line in a block mapping, so this step cannot blank it, and Checkov would drop this file.", k)
+              end
+              if tied?(k) || tied?(v)
+                fail!(path, "#{k.value} is an alias or carries an anchor, so this step cannot blank it, and Checkov would drop this file.", k)
+              end
+              # Leave a comment where the pair was: the one after it, such as a
+              # checkov:skip, or a bare #. A comment line, unlike an empty one, adds
+              # nothing to a keep-chomped block scalar (|+) that ends just above.
+              ending = rest[/\r?\n\z/] || "\n"
+              comment = rest.strip
+              lines[k.start_line] = line[0...k.start_column] + (comment.empty? ? "#" : comment) + ending
+            end
+            copy = lines.join
+            got = Psych.parse_stream(copy, filename: path).children.map { |doc| unshare(data(doc)) }
+            unless got == want
+              fail!(path, "The copy does not read as the original without the two keys, so it would not be judged as the original would.")
+            end
+            File.write(File.join("checkov-workflows", path), copy)
+            puts "#{path}: copied to checkov-workflows/#{path}, #{found.size} line(s) blanked."
+          rescue Psych::SyntaxError => e
+            puts "::error file=#{path},line=#{e.line}::#{e.message}"
+            exit 1
+          rescue StandardError => e
+            puts "::error file=#{path}::#{e.class}: #{e.message}"
+            exit 1
+          end
+          RUBY
+
+      - uses: bridgecrewio/checkov-action@45edc9d8856b664db2ec251f5f8632361f0a67aa # v12.3139.0
+        with:
+          directory: .
+
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    # Longer on main: see LOCK_TIMEOUT on the plan step.
+    timeout-minutes: ${{ github.ref == 'refs/heads/main' && 60 || 15 }}
+    permissions:
+      id-token: write # the OIDC token that assumes gha-shed_inventory-plan
+      contents: read  # the checkout
+    # Per ref, not shared with `apply`. `queue: max`, so a late plan waits
+    # rather than cancelling the pending plan of main's head, whose apply
+    # would then be skipped. Never cancelled: a killed plan can hold the
+    # state lock.
+    concurrency:
+      group: shed-inventory-plan-${{ github.ref }}
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.TF_PLAN_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - run: terraform init -input=false
+      - run: terraform fmt -check -recursive
+      - run: terraform validate
+
+      # Not failed yet: the output goes to the job summary first.
+      - name: Terraform plan
+        id: plan
+        continue-on-error: true
+        run: terraform plan -no-color -input=false -lock-timeout="$LOCK_TIMEOUT"
+        env:
+          # On main this plan can start while the previous run's apply holds
+          # the state lock.
+          LOCK_TIMEOUT: ${{ github.ref == 'refs/heads/main' && '45m' || '5m' }}
+
+      # To the run's job summary, where a dispatched branch's plan is read
+      # before it merges. Nothing comments on a pull request. The plan text is
+      # untrusted input, so it arrives through env, never in the script body,
+      # and is HTML-escaped inside a <pre>. Every plan shows the Amplify app's
+      # custom_headers as changed: Amplify returns the YAML it was given as
+      # JSON (modules/aws/amplify/main.tf).
+      - name: Write the plan to the job summary
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }}
+          PLAN_ERROR: ${{ steps.plan.outputs.stderr }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+        with:
+          script: |
+            const LIMIT = 60000;
+            const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            let text = process.env.PLAN_OUTCOME === 'success' ? process.env.PLAN : `${process.env.PLAN}\n${process.env.PLAN_ERROR}`;
+            text = text || '(no output)';
+            const cut = text.length > LIMIT;
+            if (cut) text = text.slice(0, LIMIT);
+            await core.summary
+              .addHeading(`Terraform plan: ${process.env.PLAN_OUTCOME}`, 3)
+              .addRaw(`<pre>${escape(text)}</pre>`)
+              .addRaw(cut ? `\n\nCut at ${LIMIT} characters; the full plan is in this step's log.` : '')
+              .addEOL()
+              .write();
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  apply:
+    name: apply and deploy
+    # On `plan`, so the two never contend for the state lock; on the builds and
+    # the scan, because a finding that fails after the apply is not a gate.
+    needs: [plan, build, build-backend, tf-scan]
+    # main only. A dispatch of another branch plans and stops here.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      id-token: write # the OIDC token that assumes gha-shed_inventory
+      contents: read  # the checkout
+    # This job holds the write role, so it restores nothing from the cache.
+    cache-mode: none
+    # Its own group, so no volume of `plan` jobs can evict a waiting apply.
+    # `queue: max` keeps every arrival waiting; the head check below is what
+    # makes any order safe. Never cancelled in progress: an interrupted apply
+    # can leave state and reality out of sync.
+    concurrency:
+      group: shed-inventory-apply
+      cancel-in-progress: false
+      queue: max
+    # The write role trusts only this environment, on main.
+    environment: aws-infra
+    # Every step after the head check runs only when it says `current`, and
+    # nothing but the checkout comes before it. scripts/main-head-check.test.js
+    # holds both.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # A run whose commit main has moved past stops here without failing:
+      # the run for main's head carries everything this one would. Exit 2, a
+      # head that could not be read, fails the job rather than guess.
+      - name: Stop unless this commit is main's head
+        id: head
+        run: |
+          set -euo pipefail
+          rc=0
+          ./scripts/main-head-check.sh "$GITHUB_SHA" origin || rc=$?
+          case "$rc" in
+            0) echo "current=true" >> "$GITHUB_OUTPUT" ;;
+            1)
+              echo "current=false" >> "$GITHUB_OUTPUT"
+              msg="This run is for $GITHUB_SHA, and main has moved past it, so it applies and deploys nothing. Dispatch the workflow on main to apply main's head."
+              echo "::notice title=Nothing applied::$msg"
+              {
+                echo "### Nothing applied"
+                echo
+                echo "$msg"
+                echo
+              } >> "$GITHUB_STEP_SUMMARY" ;;
+            *)
+              echo "::error::scripts/main-head-check.sh could not read main's head (exit ${rc}), so nothing was applied."
+              exit 1 ;;
+          esac
+
+      # An empty id would make download-artifact fetch by name. Before the
+      # credentials, so a missing one stops the deploy before anything changed.
+      - name: Check the artifact ids
+        if: steps.head.outputs.current == 'true'
+        env:
+          SITE_ID: ${{ needs.build.outputs.site-artifact-id }}
+          BACKEND_ID: ${{ needs.build-backend.outputs.backend-artifact-id }}
+        run: |
+          set -euo pipefail
+          for pair in "site=$SITE_ID" "backend=$BACKEND_ID"; do
+            case "${pair#*=}" in
+              '' | *[!0-9]*)
+                echo "::error::No artifact id for ${pair%%=*} (got '${pair#*=}'); refusing to download it by name."
+                exit 1 ;;
+            esac
+          done
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        if: steps.head.outputs.current == 'true'
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: steps.head.outputs.current == 'true'
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.TF_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - run: terraform init -input=false
+        if: steps.head.outputs.current == 'true'
+
+      # Re-plans rather than applying the plan job's output.
+      - name: Terraform apply
+        if: steps.head.outputs.current == 'true'
+        run: terraform apply -auto-approve -input=false -lock-timeout=5m
+
+      # The Lambda code, by artifact id with its digest checked, so the bytes
+      # `build-backend` tested are the bytes that ship.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.head.outputs.current == 'true'
+        with:
+          artifact-ids: ${{ needs.build-backend.outputs.backend-artifact-id }}
+          path: .
+          digest-mismatch: error
+
+      # --publish keeps each deploy's bundle as a numbered version, a rollback
+      # copy that outlives the 7-day artifact. The API calls $LATEST.
+      - name: Deploy backend Lambda
+        if: steps.head.outputs.current == 'true'
+        run: |
+          set -euo pipefail
+          FN=$(terraform output -raw backend_lambda_function_name)
+          aws lambda update-function-code \
+            --function-name "$FN" \
+            --zip-file fileb://backend.zip \
+            --publish > /dev/null
+          aws lambda wait function-updated --function-name "$FN"
+          echo "Deployed backend code to $FN"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.head.outputs.current == 'true'
+        with:
+          artifact-ids: ${{ needs.build.outputs.site-artifact-id }}
+          path: dist
+          digest-mismatch: error
+
+      # After the apply: the API URL does not exist until the API does. jq, so
+      # an output with a quote cannot make JSON the site refuses.
+      - name: Write runtime config
+        if: steps.head.outputs.current == 'true'
+        run: |
+          set -euo pipefail
+          jq -n --arg apiBase "$(terraform output -raw api_url)" '{apiBase: $apiBase}' > dist/config.json
+          jq -e 'all(.[]; . != "")' dist/config.json > /dev/null
+          echo "Wrote dist/config.json for $(jq -r .apiBase dist/config.json)"
+
+      # A content publish through the manual-deploy API: Amplify is not
+      # connected to this repository.
+      - name: Deploy site to Amplify
+        if: steps.head.outputs.current == 'true'
+        run: |
+          set -euo pipefail
+          # Assigned first: bash -e misses a failed substitution in an argument.
+          APP_ID=$(terraform output -raw amplify_app_id)
+          ./scripts/amplify-publish.sh "$APP_ID" main dist
+
+      - run: terraform output site_url
+        if: steps.head.outputs.current == 'true'
+
+      # The backend answers through the API the site will call.
+      - name: Check the API's health route
+        if: steps.head.outputs.current == 'true'
+        run: |
+          set -euo pipefail
+          API=$(terraform output -raw api_url)
+          for attempt in 1 2 3 4 5 6; do
+            if curl -sS -m 10 --fail "$API/health" | jq -e '.ok == true' > /dev/null; then
+              echo "GET $API/health answered ok."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: not ok yet."
+            sleep 5
+          done
+          echo "::error::GET $API/health did not answer {\"ok\": true}."
+          exit 1
+
+      # The served Content-Security-Policy against `site_csp`, directive by
+      # directive (scripts/csp-compare.sh). Fails only on the app's 200 with no
+      # CSP, or one still different after twelve attempts; a US-only WAF block
+      # from a non-US runner and CloudFront lag both end in a warning.
+      - name: Verify security headers are served
+        if: steps.head.outputs.current == 'true'
+        run: |
+          set -uo pipefail
+          if ! SITE_URL=$(terraform output -raw site_url) || [ -z "$SITE_URL" ]; then
+            echo "::error::terraform output gave no site_url; nothing was checked."
+            exit 1
+          fi
+          if ! EXPECTED=$(terraform output -raw site_csp) || [ -z "$EXPECTED" ]; then
+            echo "::error::terraform output gave no site_csp, so there is nothing to compare the served header with."
+            exit 1
+          fi
+          attempts=12
+          last_status=""
+          csp=""
+          for attempt in $(seq 1 "$attempts"); do
+            if [ "$attempt" -gt 1 ]; then
+              sleep 10
+            fi
+            headers=$(curl -sS -m 15 -A gha-deploy-healthcheck -D - -o /dev/null "$SITE_URL/" | tr -d '\r' || true)
+            status=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+            if [ -z "$status" ]; then
+              echo "Attempt ${attempt}: no answer."
+              continue
+            fi
+            last_status=$status
+            csp=$(printf '%s\n' "$headers" | awk 'tolower($0) ~ /^content-security-policy:/ {
+              sub(/^[^:]*:[[:space:]]*/, ""); v = v (n++ ? ", " : "") $0 } END { printf "%s", v }')
+            if [ -z "$csp" ]; then
+              echo "Attempt ${attempt}: status=${last_status}, no CSP header yet."
+              continue
+            fi
+            rc=0
+            ./scripts/csp-compare.sh "$EXPECTED" "$csp" > /dev/null || rc=$?
+            case "$rc" in
+              0) echo "Content-Security-Policy served OK: it matches site_csp."; exit 0 ;;
+              1) echo "Attempt ${attempt}: status=${last_status}, the served CSP does not match site_csp yet." ;;
+              *) echo "::error::scripts/csp-compare.sh could not compare the two policies (exit ${rc})."; exit 1 ;;
+            esac
+          done
+          if [ "${last_status:-}" = "200" ]; then
+            echo "::error::Site served 200 but its Content-Security-Policy is missing or still differs from site_csp after ${attempts} attempts."
+            ./scripts/csp-compare.sh "$EXPECTED" "$csp" || true
+            exit 1
+          fi
+          echo "::warning::Could not confirm the CSP from this runner (last status ${last_status:-none}). A US-only WAF block from a non-US runner and a CloudFront propagation delay both look like this and are not deploy failures."

@@ -1,0 +1,59 @@
+# Dependency updates. The shape below is the same in every repository
+# (jerryaswell/terraform_infrastructure#119, C4); entries and comments marked as
+# this repository's own are the only differences.
+#
+# Every action in these workflows is pinned to a commit SHA with its full
+# version in a trailing comment, which is what stops a moving tag being
+# repointed at hostile code in a job holding credentials — the shape of the
+# tj-actions/changed-files compromise. A SHA pin only stays safe if it also
+# stays current, and Dependabot is what updates both the SHA and the comment.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # One PR for the routine bumps rather than one per action. Security
+      # advisories are raised separately by Dependabot regardless of grouping.
+      actions:
+        patterns: ['*']
+
+  # Every npm entry waits 7 days after a release before proposing it, and 14
+  # for a new major. Cooldown applies to version updates only, so it never
+  # holds back a security update. See
+  # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      dev:
+        dependency-type: development
+      prod:
+        dependency-type: production
+
+  # This repository's own: the Lambda bundle, which has its own lockfile and
+  # its own blast radius, since this is the code that touches the table. The
+  # same cooldown as the entry above.
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      # This repository's own group: the backend's dependencies come in one
+      # pull request.
+      backend:
+        patterns: ['*']
+
+  - package-ecosystem: terraform
+    directory: /
+    schedule:
+      interval: weekly

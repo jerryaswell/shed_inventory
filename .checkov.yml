@@ -1,0 +1,55 @@
+# Static analysis for the Terraform and the workflows. CI runs it in its own
+# `tf-scan` job, which holds `contents: read` only and never assumes an AWS
+# role; `apply` needs both `plan` and `tf-scan`. Checkov auto-loads this file,
+# so `checkov -d .` locally does what CI does once the workflows are copied as
+# `tf-scan`'s "Copy the workflows for checkov" step copies them (see below).
+# This file is the same in every repository that carries Terraform
+# (jerryaswell/terraform_infrastructure#119, C3); only the section at the end,
+# if there is one, is the repository's own.
+#
+# What it catches is what fmt and validate cannot: a configuration that is
+# syntactically valid and still insecure — a public bucket, an unencrypted
+# store, a log group with no retention, a policy wider than it needs to be.
+#
+# What it does not catch is anything that is not there. Its rules are about
+# the resources a configuration declares, not about what is absent, and it is
+# not a semantic reviewer: an inverted NotResource deny or a boundary that says
+# the opposite of what was intended still passes it. Those take a human.
+#
+# A deliberate exception is suppressed inline on the resource, with a
+# `#checkov:skip=<id>:<reason>` comment, rather than in a list here. A skip list
+# in this file would be a set of check ids with no resource and no argument
+# attached, which is how a suppression outlives the reason for it. Do not use a
+# `baseline:` file either: a checkov baseline matches on resource address and
+# check id alone, so it keeps suppressing a resource through later widenings.
+#
+# One thing the github_actions framework does not do: it does not flag an
+# action pinned to a mutable tag. The SHA-pinning rule in CLAUDE.md is enforced
+# by review and by Dependabot, not by this scan.
+#
+# It also drops, with no error and no parsing error, any workflow that fails
+# the schema it vendors, and any its YAML loader cannot read, so a green scan
+# says nothing of a workflow it dropped. `LOG_LEVEL=INFO` shows each schema
+# drop as "Given entity configuration does not match the schema",
+# `LOG_LEVEL=DEBUG` each unreadable file as "Fail to load yaml content", which
+# quotes the failing lines but names no file, and `--config-file` naming a file
+# that sets `quiet: false` lists each workflow a scan read (`quiet` below hides
+# passed results, in `-o json` too). That schema has no workflow-level
+# `cache-mode` and no `queue` under `concurrency`, one or both of which these
+# workflows use, so `tf-scan` also scans a copy of each workflow that has
+# either, with those lines blanked, under `checkov-workflows/`
+# (jerryaswell/terraform_infrastructure#141). A workflow dropped for any other
+# reason is still dropped unseen.
+
+framework:
+  - terraform
+  - github_actions
+
+# Guidance text for each check is fetched from the vendor's API and is not worth
+# a network call in CI: the check id and the resource are enough to look one up,
+# and a run that depends on a third-party endpoint being reachable fails for
+# reasons that have nothing to do with the code.
+skip-download: true
+
+compact: true
+quiet: true

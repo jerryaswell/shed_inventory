@@ -1,0 +1,17 @@
+{
+  "name": "shed-inventory-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "description": "The shed inventory's API: one Lambda behind an API Gateway HTTP API, over one DynamoDB table.",
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
