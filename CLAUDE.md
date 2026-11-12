@@ -186,9 +186,9 @@ API, then set to `terraform output -raw api_url`.
 runs on AdministratorAccess (`administrator_access` on that entry), because
 its permissions reach its Amplify app by id and the app does not exist until
 that apply creates it. A change there then records the app id and replaces
-admin with a policy of this repository's own: Amplify and the web ACL, as the
-static spokes have, plus the table, the function and its role, and the HTTP
-API.
+admin with a policy of this repository's own: its Amplify app, as the static
+spokes have, plus the table, the function and its role, and the HTTP API. It
+has no web ACL.
 
 State is `s3://jerryaswell-terraform-state/shed_inventory/terraform.tfstate`.
 

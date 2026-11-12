@@ -7,8 +7,6 @@ amplify_app_name    = "shed-inventory"
 amplify_branch_name = "main"
 backend_name        = "shed-inventory"
 
-allowed_country_codes = ["US"]
-
 # The dev server reaches the deployed API. Turn off to close CORS to localhost.
 allow_localhost_origin = true
 

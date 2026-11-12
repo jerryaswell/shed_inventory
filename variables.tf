@@ -3,7 +3,7 @@
 # (jerryaswell/terraform_infrastructure#119, C12). No input has a default.
 
 variable "aws_region" {
-  description = "Region for everything but the CLOUDFRONT-scope web ACL, which is always in us-east-1."
+  description = "Region for every resource."
   type        = string
 }
 
@@ -13,7 +13,7 @@ variable "github_org" {
 }
 
 variable "amplify_app_name" {
-  description = "The Amplify app's name, and the base of the web ACL's and its log group's names."
+  description = "The Amplify app's name."
   type        = string
 
   validation {
@@ -34,16 +34,6 @@ variable "backend_name" {
   validation {
     condition     = can(regex("^[a-z][a-z0-9-]{2,40}$", var.backend_name))
     error_message = "Lowercase letters, digits and hyphens, starting with a letter, 3 to 41 characters."
-  }
-}
-
-variable "allowed_country_codes" {
-  description = "ISO 3166-1 alpha-2 codes of the countries the web ACL lets reach the site. Every other country is blocked."
-  type        = list(string)
-
-  validation {
-    condition     = length(var.allowed_country_codes) > 0 && alltrue([for c in var.allowed_country_codes : can(regex("^[A-Z]{2}$", c))])
-    error_message = "At least one code, each two capital letters."
   }
 }
 

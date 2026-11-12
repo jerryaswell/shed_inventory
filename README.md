@@ -52,13 +52,13 @@ scripts/                     shared with the other spokes, with their tests:
   check-lockfiles.js           every lock entry has an integrity and a registry URL
   csp-compare.sh               the served CSP against the one Terraform built
 modules/aws/
-  amplify/                   the app, its headers (CSP, Permissions-Policy), and the web ACL
+  amplify/                   the app and its headers (CSP, Permissions-Policy)
   dynamodb/                  the inventory table (point-in-time recovery, prevent_destroy)
   lambda/                    the function, its role and log group
   apigateway/                the HTTP API, its access log and throttle
 versions.tf                  Terraform and provider pins, S3 backend
 .terraform.lock.hcl          provider versions and hashes
-providers.tf                 AWS, plus the us-east-1 alias the web ACL needs
+providers.tf                 AWS, with the default tags
 variables.tf                 inputs: description, type, validation
 terraform.tfvars             the inputs' values, none secret
 data.tf                      origins and tags

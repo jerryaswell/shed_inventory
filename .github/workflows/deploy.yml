@@ -588,8 +588,8 @@ jobs:
 
       # The served Content-Security-Policy against `site_csp`, directive by
       # directive (scripts/csp-compare.sh). Fails only on the app's 200 with no
-      # CSP, or one still different after twelve attempts; a US-only WAF block
-      # from a non-US runner and CloudFront lag both end in a warning.
+      # CSP, or one still different after twelve attempts; no answer at all,
+      # or CloudFront lag, ends in a warning.
       - name: Verify security headers are served
         if: steps.head.outputs.current == 'true'
         run: |
@@ -635,4 +635,4 @@ jobs:
             ./scripts/csp-compare.sh "$EXPECTED" "$csp" || true
             exit 1
           fi
-          echo "::warning::Could not confirm the CSP from this runner (last status ${last_status:-none}). A US-only WAF block from a non-US runner and a CloudFront propagation delay both look like this and are not deploy failures."
+          echo "::warning::Could not confirm the CSP from this runner (last status ${last_status:-none}). A CloudFront propagation delay looks like this and is not a deploy failure."

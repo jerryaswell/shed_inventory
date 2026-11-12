@@ -1,14 +1,8 @@
 module "site" {
   source = "./modules/aws/amplify"
 
-  providers = {
-    aws           = aws
-    aws.us_east_1 = aws.us_east_1
-  }
-
-  app_name              = var.amplify_app_name
-  branch_name           = var.amplify_branch_name
-  allowed_country_codes = var.allowed_country_codes
+  app_name    = var.amplify_app_name
+  branch_name = var.amplify_branch_name
 
   # The origin the CSP lets the page call. Built from variables, not read from
   # module.api, which already depends on this module through its CORS list.
