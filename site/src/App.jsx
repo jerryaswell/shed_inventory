@@ -54,7 +54,7 @@ export default function App({
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  // Sample data unless a deployed config.json names an API; then whether it answers.
+  // API connectivity is separate from the simulated inventory and microphone.
   useEffect(() => {
     let live = true;
     (async () => {
@@ -128,9 +128,7 @@ export default function App({
   return (
     <div className="kiosk" onPointerDownCapture={() => setLastTouch(clock())}>
       <StatusBar status={status} now={now} />
-      {status === 'sample' && (
-        <p className="banner">Mockup: sample inventory, nothing is saved, and the mic plays a script.</p>
-      )}
+      <p className="banner">Mockup: sample inventory, nothing is saved, and the mic plays a script.</p>
 
       <main className="stage">
         <MicButton phase={phase} onTap={onMic} compact={result != null} />

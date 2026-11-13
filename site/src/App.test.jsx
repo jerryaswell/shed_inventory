@@ -41,9 +41,22 @@ test('with no config.json it says it is a mockup on sample data', async () => {
   expect(host.textContent).toContain('Mockup');
 });
 
-test('a deployed API that answers shows Online', async () => {
-  await mount({ loadConfigImpl: async () => ({ apiBase: 'https://api' }), checkHealthImpl: async () => true });
+test.each([[true, 'Online'], [false, 'Offline']])('a deployed API health result of %s shows %s without hiding the mockup disclosure', async (healthy, status) => {
+  await mount({ loadConfigImpl: async () => ({ apiBase: 'https://api' }), checkHealthImpl: async () => healthy });
+  expect(host.textContent).toContain(status);
+  expect(host.textContent).toContain('Mockup: sample inventory, nothing is saved, and the mic plays a script.');
+});
+
+test('the mockup disclosure stays visible while the API health check is pending', async () => {
+  let finishHealthCheck;
+  const healthCheck = new Promise((resolve) => { finishHealthCheck = resolve; });
+  await mount({ loadConfigImpl: async () => ({ apiBase: 'https://api' }), checkHealthImpl: () => healthCheck });
+  expect(host.textContent).toContain('Connecting');
+  expect(host.textContent).toContain('Mockup: sample inventory, nothing is saved, and the mic plays a script.');
+
+  await act(async () => finishHealthCheck(true));
   expect(host.textContent).toContain('Online');
+  expect(host.textContent).toContain('Mockup: sample inventory, nothing is saved, and the mic plays a script.');
 });
 
 test('tap, listen, answer: the first script line finds the drill', async () => {
