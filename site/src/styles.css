@@ -219,6 +219,9 @@ button:disabled { cursor: default; opacity: 0.5; }
   user-select: text;
 }
 .sheet-list { flex: 1; overflow-y: auto; padding-bottom: 24px; }
+.sheet-feedback { flex-shrink: 0; border-top: 1px solid var(--line); padding: 12px 0 16px; }
+.sheet-feedback p { margin: 0 0 10px; }
+.sheet-feedback .undo { width: 100%; }
 .sheet-area { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 18px 0 8px; }
 .sheet-empty { color: var(--muted); text-align: center; margin-top: 40px; }
 

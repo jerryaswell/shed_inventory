@@ -3,10 +3,10 @@
  * network is down. Big ± buttons for stock, In/Out for tools.
  */
 import { useState } from 'react';
-import { X, Minus, Plus, Search } from 'lucide-react';
+import { X, Minus, Plus, Search, Undo2 } from 'lucide-react';
 import { byArea, describeStock, isLow, search } from '../core/inventory.js';
 
-export default function SearchSheet({ items, onClose, onChange }) {
+export default function SearchSheet({ items, onClose, onChange, notice, undoLeft = 0, onUndo }) {
   const [query, setQuery] = useState('');
   const groups = byArea(search(items, query));
   return (
@@ -56,6 +56,18 @@ export default function SearchSheet({ items, onClose, onChange }) {
           </section>
         ))}
       </div>
+      {notice && (
+        <div className="sheet-feedback">
+          <p role="status">{notice}</p>
+          {undoLeft > 0 && (
+            <button type="button" className="undo" onClick={onUndo}>
+              <Undo2 size={26} aria-hidden="true" />
+              Undo
+              <span className="undo-left" aria-hidden="true">{undoLeft}s</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

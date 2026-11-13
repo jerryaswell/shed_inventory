@@ -114,7 +114,18 @@ export default function App({
     answer(resolve(item, result.pending.action, result.pending.quantity, result.heard));
   };
 
+  const onManualChange = (change) => {
+    // A pending scripted answer must not replace the manual change's Undo.
+    clearTimeout(timer.current);
+    const item = itemsRef.current.find((i) => i.id === change.itemId);
+    answer({ action: 'adjust', heard: null, itemId: item.id, change, reply: `Updated ${item.name}.` });
+  };
+
   const onUndo = () => {
+    if (!undo || clock() >= undo.until) {
+      setUndo(null);
+      return;
+    }
     setItems((cur) => applyChange(cur, undo.change));
     setUndo(null);
     setResult({ action: 'undone', heard: null, reply: 'Undone. The count is back to what it was.' });
@@ -133,7 +144,7 @@ export default function App({
       <main className="stage">
         <MicButton phase={phase} onTap={onMic} compact={result != null} />
         {result ? (
-          <Reply result={result} items={items} undoLeft={undoLeft} onUndo={onUndo} onPick={onPick} />
+          <Reply result={result} items={items} undoLeft={sheetOpen ? 0 : undoLeft} onUndo={onUndo} onPick={onPick} />
         ) : (
           phase === 'idle' && (
             <section className="try">
@@ -161,7 +172,10 @@ export default function App({
         <SearchSheet
           items={items}
           onClose={() => setSheetOpen(false)}
-          onChange={(change) => setItems((cur) => applyChange(cur, change))}
+          onChange={onManualChange}
+          notice={result?.action === 'undone' ? 'Last change undone.' : result?.change ? result.reply : null}
+          undoLeft={undoLeft}
+          onUndo={onUndo}
         />
       )}
       {sleeping && <Screensaver now={now} onWake={() => setLastTouch(clock())} />}
