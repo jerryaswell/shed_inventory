@@ -277,6 +277,53 @@ test('the screensaver comes on after a minute and a half untouched, and a tap wa
   expect(host.querySelector('.ambient-background').dataset.paused).toBe('false');
 });
 
+test('Browse left open sleeps too, and waking reopens it with its search, scroll and focus kept', async () => {
+  await mount();
+  await click('Browse items');
+  const dialog = host.querySelector('dialog.sheet');
+  const input = dialog.querySelector('input[type="search"]');
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  await act(async () => {
+    setValue.call(input, 'glue');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  dialog.querySelector('.sheet-content').scrollTop = 40;
+  const control = button('Add one bottle to Wood glue');
+  control.focus();
+
+  await advance(91_000);
+  // A modal dialog sits in the top layer, above any saver: it is closed, not
+  // covered, while the kiosk sleeps, and stays mounted so nothing is lost.
+  expect(host.querySelector('.saver')).not.toBeNull();
+  expect(host.querySelector('.ambient-background').dataset.sleeping).toBe('true');
+  expect(host.querySelector('dialog.sheet')).toBe(dialog);
+  expect(dialog.open).toBe(false);
+  expect(document.activeElement).toBe(host.querySelector('.saver'));
+
+  await pressKey('Escape');
+  await advance(500);
+  expect(host.querySelector('.saver')).toBeNull();
+  expect(dialog.open).toBe(true);
+  expect(input.value).toBe('glue');
+  expect(dialog.querySelector('.sheet-content').scrollTop).toBe(40);
+  expect(document.activeElement).toBe(control);
+  // Escape woke the screen; it did not close the sheet.
+  expect(host.querySelector('dialog.sheet')).toBe(dialog);
+});
+
+test('a Browse sheet whose focused control went away while asleep wakes with focus on its title', async () => {
+  await mount();
+  await click('Browse items');
+  await click(`Add one bulb to ${ledName}`);
+  host.querySelector('.sheet button.undo').focus();
+  await advance(91_000);
+  expect(host.querySelector('.sheet button.undo')).toBeNull();
+  await act(async () => button('Wake the screen').click());
+  await advance(500);
+  expect(host.querySelector('dialog.sheet').open).toBe(true);
+  expect(document.activeElement).toBe(host.querySelector('.sheet-title'));
+});
+
 /**
  * Press a key on whatever has focus, and do what a browser does with a button
  * when the page does not cancel it: Enter presses it on keydown, Space on

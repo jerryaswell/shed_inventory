@@ -143,25 +143,27 @@ export default function App({
   // The clock ticks every half second, so it can trail the moment Undo was set.
   const undoLeft = undo ? Math.min(UNDO_MS / 1000, Math.max(0, Math.ceil((undo.until - now) / 1000))) : 0;
   const busy = phase === 'listening' || phase === 'thinking';
-  const sleeping = !sheetOpen && !busy && now - lastTouch > IDLE_MS;
+  const sleeping = !busy && now - lastTouch > IDLE_MS;
   const motion = useAmbientMotion({ sleeping });
   const MotionIcon = motion.userPaused ? Play : Pause;
 
   // While asleep the saver holds focus and everything under it is inert, so a
   // wake key lands on the saver, not on the control that had focus. On waking,
   // focus goes back to that control, or to the answer or the mic when nothing
-  // had it. Both run after the commit that sets or clears `inert`.
+  // had it. Both run after the commit that sets or clears `inert`. An open
+  // browse sheet is suspended while asleep and puts back its own focus.
   useLayoutEffect(() => {
     if (sleeping) {
       const active = document.activeElement;
-      wakeFocus.current = active && active !== document.body ? active : (replyRef.current ?? micRef.current);
+      if (sheetOpen) wakeFocus.current = null;
+      else wakeFocus.current = active && active !== document.body ? active : (replyRef.current ?? micRef.current);
       saverRef.current?.focus({ preventScroll: true });
       return;
     }
     const control = wakeFocus.current;
     wakeFocus.current = null;
     if (control?.isConnected) control.focus({ preventScroll: true });
-  }, [sleeping]);
+  }, [sleeping, sheetOpen]);
 
   return (
     <div
@@ -226,6 +228,7 @@ export default function App({
           notice={result?.action === 'undone' ? 'Last change undone.' : result?.change ? result.reply : null}
           undoLeft={undoLeft}
           onUndo={onUndo}
+          suspended={sleeping}
         />
       )}
       {sleeping && <Screensaver now={now} onWake={() => setLastTouch(clock())} buttonRef={saverRef} />}
