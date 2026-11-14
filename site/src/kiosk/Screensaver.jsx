@@ -6,8 +6,12 @@
  * press is consumed here. A key wakes it on release, not on press: waking
  * hands focus back to the page, and a press that is still going on (Enter's
  * keypress, Space's release) would then land on the control it went to.
+ * Its clock reads the time once a minute, on the minute, as the status bar's.
  */
-export default function Screensaver({ now, onWake, buttonRef }) {
+import { useNow } from './useNow.js';
+
+export default function Screensaver({ clock = Date.now, onWake, buttonRef }) {
+  const now = useNow(60_000, clock);
   const minute = Math.floor(now / 60000);
   const x = ((minute * 37) % 60) - 30;
   const y = ((minute * 53) % 120) - 60;

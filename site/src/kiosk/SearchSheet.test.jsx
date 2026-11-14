@@ -40,8 +40,11 @@ afterEach(() => {
   }
 });
 
+// Undo deadlines below count from time zero.
+const clock = () => 0;
+
 async function mount(props = {}, strict = false) {
-  const sheet = <SearchSheet items={sampleInventory} onClose={() => root.render(null)} onChange={() => {}} {...props} />;
+  const sheet = <SearchSheet items={sampleInventory} onClose={() => root.render(null)} onChange={() => {}} clock={clock} {...props} />;
   await act(async () => root.render(strict ? <StrictMode>{sheet}</StrictMode> : sheet));
 }
 
@@ -139,10 +142,10 @@ test('search filters the rows and reports a query with no matches', async () => 
 
 test('feedback renders one Undo and follows remaining time without reopening or moving focus', async () => {
   const onUndo = vi.fn();
-  await mount({ notice: 'Updated Work gloves.', undoLeft: 10, onUndo });
+  await mount({ notice: 'Updated Work gloves.', undoUntil: 10_000, onUndo });
   const add = button('Add one pair to Work gloves');
   add.focus();
-  await mount({ notice: 'Updated Work gloves.', undoLeft: 6, onUndo });
+  await mount({ notice: 'Updated Work gloves.', undoUntil: 6_000, onUndo });
   expect(host.querySelectorAll('.undo')).toHaveLength(1);
   expect(host.querySelector('.undo').textContent).toBe('Undo6s');
   expect(host.querySelector('[role="status"]').textContent).toBe('Updated Work gloves.');
@@ -150,7 +153,7 @@ test('feedback renders one Undo and follows remaining time without reopening or 
   expect(document.activeElement).toBe(add);
   await act(async () => host.querySelector('.undo').click());
   expect(onUndo).toHaveBeenCalledTimes(1);
-  await mount({ notice: 'Last change undone.', undoLeft: 0, onUndo });
+  await mount({ notice: 'Last change undone.', onUndo });
   expect(host.querySelector('.undo')).toBeNull();
   expect(host.querySelector('[role="status"]').textContent).toBe('Last change undone.');
 });
@@ -166,9 +169,9 @@ test('Shift+Tab from the title wraps to the last control rather than leaving the
 });
 
 test('when a focused Undo goes away, focus returns to the title, inside the dialog', async () => {
-  await mount({ notice: 'Updated Work gloves.', undoLeft: 3, onUndo: () => {} });
+  await mount({ notice: 'Updated Work gloves.', undoUntil: 3_000, onUndo: () => {} });
   host.querySelector('.undo').focus();
-  await mount({ notice: 'Updated Work gloves.', undoLeft: 0, onUndo: () => {} });
+  await mount({ notice: 'Updated Work gloves.', onUndo: () => {} });
   expect(document.activeElement).toBe(host.querySelector('h1'));
 });
 
@@ -187,7 +190,7 @@ const pressTab = async (element, shiftKey = false) => {
 };
 
 test('Shift+Tab from Undo and from an overflowing notice moves back toward the inventory, not between them', async () => {
-  await mount({ notice: 'Updated LED bulbs (A19, 60W equivalent).', undoLeft: 10, onUndo: () => {} });
+  await mount({ notice: 'Updated LED bulbs (A19, 60W equivalent).', undoUntil: 10_000, onUndo: () => {} });
   const notice = host.querySelector('[role="status"]');
   overflow(notice);
   const undo = host.querySelector('.undo');
@@ -238,7 +241,7 @@ test('a notice that covers the focused row scrolls it clear by the focus gutter'
   content.getBoundingClientRect = () => ({ top: 100, bottom: 400 });
   control.getBoundingClientRect = () => ({ top: 350, bottom: 402 });
   content.scrollTop = 0;
-  await mount({ notice: 'Updated Work gloves.', undoLeft: 10, onUndo: () => {} });
+  await mount({ notice: 'Updated Work gloves.', undoUntil: 10_000, onUndo: () => {} });
   spy.mockRestore();
   // 2px hidden, plus the 8px the outline needs.
   expect(content.scrollTop).toBe(10);

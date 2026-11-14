@@ -1,6 +1,9 @@
 /**
- * The top line: what this is, the time, and whether the backend answers.
+ * The top line: what this is, the time, and whether the backend answers. The
+ * clock shows minutes, so it reads the time once a minute, on the minute.
  */
+import { useNow } from './useNow.js';
+
 const LABELS = {
   checking: 'Checking API…',
   sample: 'API not configured',
@@ -9,7 +12,8 @@ const LABELS = {
   offline: 'API unavailable'
 };
 
-export default function StatusBar({ status, now, controls }) {
+export default function StatusBar({ status, clock = Date.now, controls }) {
+  const now = useNow(60_000, clock);
   const time = new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   return (
     <header className="status">

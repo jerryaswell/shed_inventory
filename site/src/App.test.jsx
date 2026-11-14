@@ -248,6 +248,20 @@ test('closing and reopening browse does not extend manual Undo beyond ten second
   expect(button('Undo')).toBeUndefined();
 });
 
+test('a page shown again after its timers were held back drops an Undo past its deadline at once', async () => {
+  await mount();
+  await click('Browse items');
+  await click(`Add one bulb to ${ledName}`);
+  let hidden = true;
+  vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  time += 60_000; // a background tab whose timers did not run
+  hidden = false;
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  expect(button('Undo')).toBeUndefined();
+  expect(stockCount(ledName)).toBe(13);
+});
+
 test('an Undo click after its deadline cannot beat the next clock render', async () => {
   await mount();
   await click('Browse items');
@@ -286,6 +300,22 @@ test('the screensaver comes on after a minute and a half untouched, and a tap wa
   await advance(500);
   expect(host.querySelector('.saver')).toBeNull();
   expect(host.querySelector('.ambient-background').dataset.paused).toBe('false');
+});
+
+test.each([
+  ['home', async () => {}],
+  ['Browse', async () => click('Browse items')],
+  ['the screensaver', async () => advance(91_000)]
+])('on %s, nothing rerenders between the minutes of the clock', async (_, reach) => {
+  time = 1_200_000; // on a minute
+  await mount();
+  await reach();
+  const format = vi.spyOn(Date.prototype, 'toLocaleTimeString');
+  await advance(5_000);
+  expect(format).not.toHaveBeenCalled();
+  await advance(60_000 - ((time - 1_200_000) % 60_000));
+  // Each clock shown reads the new minute once.
+  expect(format).toHaveBeenCalledTimes(host.querySelector('.saver') ? 2 : 1);
 });
 
 test('Browse left open sleeps too, and waking reopens it with its search, scroll and focus kept', async () => {
