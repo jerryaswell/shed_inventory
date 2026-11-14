@@ -74,7 +74,7 @@ terraform.tfvars             the inputs' values, none secret
 data.tf                      origins and tags
 aws_*.tf                     one module call each
 outputs.tf                   what CI and a person read back
-tests/                       mocked `terraform test` runs: the inputs' validation
+tests/                       mocked `terraform test` runs: the inputs' validation, the outputs the deploy reads
 .github/workflows/deploy.yml build, scan, plan; on main, apply and ship
 .github/dependabot.yml       actions, npm (root and backend), Terraform
 .checkov.yml                 the IaC scan's configuration

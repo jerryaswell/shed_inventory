@@ -570,8 +570,11 @@ jobs:
         run: |
           set -euo pipefail
           # Assigned first: bash -e misses a failed substitution in an argument.
+          # The hosting branch is the amplify_branch_name input, read back
+          # from Terraform; only GitHub's main reaches this job either way.
           APP_ID=$(terraform output -raw amplify_app_id)
-          ./scripts/amplify-publish.sh "$APP_ID" main dist
+          BRANCH=$(terraform output -raw amplify_branch_name)
+          ./scripts/amplify-publish.sh "$APP_ID" "$BRANCH" dist
 
       - run: terraform output site_url
         if: steps.head.outputs.current == 'true'

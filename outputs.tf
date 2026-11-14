@@ -1,10 +1,15 @@
 # What CI and a person read back. The deploy reads amplify_app_id,
-# backend_lambda_function_name and api_url; site_url and site_csp are for the
+# amplify_branch_name, backend_lambda_function_name and api_url; site_url and site_csp are for the
 # check that the site serves its headers.
 
 output "amplify_app_id" {
   description = "The Amplify app's id. The deploy publishes the site to it."
   value       = module.site.app_id
+}
+
+output "amplify_branch_name" {
+  description = "The Amplify production branch. The deploy publishes the site to it, so the publish follows amplify_branch_name rather than a literal."
+  value       = module.site.branch_name
 }
 
 output "site_url" {
