@@ -55,3 +55,34 @@ test('a count left of a unit with an irregular plural reads correctly', () => {
   const items = sampleInventory.map((i) => (i.id === 'screws-deck' ? { ...i, quantity: 3 } : i));
   expect(interpret('taking a box of deck screws', items).reply).toContain('2 boxes left');
 });
+
+const withFlood = (quantity) => sampleInventory.map((i) => (i.id === 'bulb-par38' ? { ...i, quantity } : i));
+const flood = (items) => items.find((i) => i.id === 'bulb-par38');
+
+test('taking from depleted stock is refused, with no change to undo', () => {
+  const items = withFlood(0);
+  const r = resolve(flood(items), 'take', 3, "I'm taking three lightbulbs");
+  expect(r.action).toBe('unknown');
+  expect(r.change).toBeUndefined();
+  expect(r.reply).not.toMatch(/Took/);
+});
+
+test('taking more than is there takes and reports only what was there', () => {
+  const items = withFlood(1);
+  const r = resolve(flood(items), 'take', 3, "I'm taking three lightbulbs");
+  expect(r.change).toEqual({ itemId: 'bulb-par38', delta: -1 });
+  expect(r.reply).toContain('Only 1 bulb there.');
+  expect(r.reply).toContain('Took 1 × Flood bulbs');
+  expect(r.reply).toContain('0 bulbs left');
+  expect(flood(applyChange(items, r.change)).quantity).toBe(0);
+});
+
+test('the sample script run twice on flood bulbs takes them once, then refuses', () => {
+  let items = sampleInventory;
+  const first = resolve(flood(items), 'take', 3, 'x');
+  expect(first.change).toEqual({ itemId: 'bulb-par38', delta: -3 });
+  items = applyChange(items, first.change);
+  const second = resolve(flood(items), 'take', 3, 'x');
+  expect(second.action).toBe('unknown');
+  expect(second.change).toBeUndefined();
+});
