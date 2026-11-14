@@ -118,17 +118,20 @@ async function uploadServer(t, statuses) {
 
 /**
  * Run the script as `publish` does, but without blocking, so the upload
- * server in this process can answer the real curl.
+ * server in this process can answer the real curl. Past `timeout` the script
+ * is killed with its whole process group, curl included, and the status is
+ * null.
  */
-function publishTo({ root, dist }, url) {
+function publishTo({ root, dist }, url, { timeout = 30_000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn('bash', [SCRIPT, 'app-id', 'pr-1', dist], {
-      env: scriptEnv(root, { STUB_UPLOAD_URL: url })
+      env: scriptEnv(root, { STUB_UPLOAD_URL: url }),
+      detached: true
     });
     let out = '';
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (out += d));
-    const timer = setTimeout(() => child.kill('SIGKILL'), 30_000);
+    const timer = setTimeout(() => process.kill(-child.pid, 'SIGKILL'), timeout);
     child.on('error', reject);
     child.on('close', (status) => {
       clearTimeout(timer);
@@ -215,6 +218,66 @@ test('amplify-publish: an upload answered 403 is not retried', async (t) => {
   const r = await publishTo(s, upload.url);
   assert.notEqual(r.status, 0, r.out);
   assert.equal(upload.bodies.length, 1, r.out);
+  assert.deepEqual(
+    r.calls.map((c) => c.split(' ').slice(0, 3).join(' ')),
+    ['aws amplify create-deployment']
+  );
+});
+
+test('amplify-publish: each upload attempt has a connection and transfer deadline, and the retries a budget (#23)', (t) => {
+  // Retries alone never end an attempt that stalls; these are what do.
+  const r = publish(setup(t, { 'index.html': INDEX }));
+  assert.equal(r.status, 0, r.out);
+  const upload = r.calls[1];
+  assert.match(upload, / --connect-timeout 10 /);
+  assert.match(upload, / --max-time 120 /);
+  assert.match(upload, / --retry-max-time 300 /);
+});
+
+/**
+ * A curl first on PATH that shortens the script's --max-time to 1 second and
+ * its --retry-max-time to 4, then runs the real curl with every other argument
+ * as given, so a stalled upload is held to the script's own flags in seconds
+ * rather than minutes. The values themselves are checked in the test above.
+ */
+const SHORT_DEADLINE_CURL = `#!/usr/bin/env bash
+args=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --max-time) args+=("$1" 1); shift 2 ;;
+    --retry-max-time) args+=("$1" 4); shift 2 ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+PATH=\${PATH#*:} exec curl "\${args[@]}"
+`;
+
+test('amplify-publish: an upload whose response never comes times out and never starts the deployment (#23)', async (t) => {
+  // The server takes the whole zip and withholds its answer. Without a
+  // transfer deadline curl waits on it until it is killed.
+  const s = setup(t, { 'index.html': INDEX }, { realCurl: true });
+  writeFileSync(join(s.root, 'bin', 'curl'), SHORT_DEADLINE_CURL);
+  chmodSync(join(s.root, 'bin', 'curl'), 0o755);
+  const bodies = [];
+  const server = createServer((req) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => bodies.push(Buffer.concat(chunks)));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => {
+    server.closeAllConnections();
+    return new Promise((resolve) => server.close(resolve));
+  });
+  const started = Date.now();
+  const r = await publishTo(s, `http://127.0.0.1:${server.address().port}/site.zip`, { timeout: 20_000 });
+  const elapsed = Date.now() - started;
+  assert.notEqual(r.status, null, `killed after ${elapsed} ms rather than timing out: ${r.out}`);
+  assert.notEqual(r.status, 0, r.out);
+  assert.match(r.out, /timed out/i);
+  assert.ok(bodies.length >= 2, `the stalled upload was not retried: ${bodies.length} attempt(s)`);
+  assert.ok(bodies.length <= 4, `${bodies.length} attempts`);
+  assert.equal(bodies[0].subarray(0, 2).toString(), 'PK', 'the upload is the zip');
   assert.deepEqual(
     r.calls.map((c) => c.split(' ').slice(0, 3).join(' ')),
     ['aws amplify create-deployment']

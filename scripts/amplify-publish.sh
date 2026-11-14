@@ -63,10 +63,19 @@ upload_url=$(echo "$deployment" | jq -r .zipUploadUrl)
 # turns off curl's doubling backoff. It does not turn off Retry-After: when a
 # retried response carries one, curl waits that long instead (curl 8.5.0), or
 # whichever of the two is longer (later versions). The upload is a PUT of the
-# whole zip to one presigned URL, so sending it again is safe. The other
-# spokes' copies retry the same way (jerryaswell/terraform_infrastructure#119,
-# C9); a change to the flags is made in all of them together.
+# whole zip to one presigned URL, so sending it again is safe.
+#
+# Retries alone do not end a stalled attempt: a server that takes the whole
+# zip and never answers would hold curl until the job's own timeout (#23). So
+# each attempt has a deadline: ten seconds to connect, and two minutes for the
+# whole transfer, which a bundle of a few megabytes clears many times over;
+# curl counts a missed deadline as a timeout and retries it. --retry-max-time
+# stops starting new attempts five minutes in, so the upload as a whole ends
+# within about seven. The other spokes' copies retry the same way
+# (jerryaswell/terraform_infrastructure#119, C9); a change to the flags is made
+# in all of them together.
 curl -sS --fail --retry 3 --retry-connrefused --retry-delay 2 \
+  --connect-timeout 10 --max-time 120 --retry-max-time 300 \
   --request PUT --data-binary "@$zip" "$upload_url"
 
 aws amplify start-deployment --app-id "$app_id" --branch-name "$branch" --job-id "$job_id" > /dev/null
