@@ -14,7 +14,7 @@ variable "table_arn" {
 }
 
 variable "reserved_concurrency" {
-  description = "Concurrent executions reserved for, and so the most allowed to, the function. One kiosk and a laptop need very few."
+  description = "Concurrent executions reserved for, and so the most allowed to, the function. -1 uses the shared account pool without a function-specific cap."
   type        = number
   default     = 5
 }

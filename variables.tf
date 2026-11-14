@@ -37,6 +37,16 @@ variable "backend_name" {
   }
 }
 
+variable "backend_reserved_concurrency" {
+  description = "Maximum concurrent Lambda executions when positive; -1 uses the account's shared pool without a function-specific cap. Zero would disable the API and is refused."
+  type        = number
+
+  validation {
+    condition     = var.backend_reserved_concurrency == -1 || (var.backend_reserved_concurrency >= 1 && floor(var.backend_reserved_concurrency) == var.backend_reserved_concurrency)
+    error_message = "Use -1 for the shared pool, or a positive whole number for reserved concurrency."
+  }
+}
+
 variable "allow_localhost_origin" {
   description = "Whether the API's CORS list admits the Vite dev server (http://localhost:5173), so the site can run locally against the real backend."
   type        = bool

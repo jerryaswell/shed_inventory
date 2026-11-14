@@ -378,6 +378,9 @@ jobs:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.TF_PLAN_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Report Lambda account capacity
+        run: aws lambda get-account-settings --query 'AccountLimit.{ConcurrentExecutions:ConcurrentExecutions,UnreservedConcurrentExecutions:UnreservedConcurrentExecutions}' --output json
+
       - run: terraform init -input=false
       - run: terraform fmt -check -recursive
       - run: terraform validate
