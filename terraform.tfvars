@@ -7,10 +7,13 @@ amplify_app_name    = "shed-inventory"
 amplify_branch_name = "main"
 backend_name        = "shed-inventory"
 
+# The first apply could not reserve five executions while preserving the
+# account's required unreserved pool. The API throttle remains 5 requests/s,
+# burst 10; this function shares account capacity until a reservation fits.
+backend_reserved_concurrency = -1
+
 # The dev server reaches the deployed API. Turn off to close CORS to localhost.
 allow_localhost_origin = true
 
-# Empty until the first apply has created the API. Then set it to
-# `terraform output -raw api_url`, so the CSP names that one host rather than
-# every API Gateway in the region.
-api_origin_override = ""
+# The exact API created by the first apply; the CSP admits only this host.
+api_origin_override = "https://98jwo8ikz2.execute-api.us-east-2.amazonaws.com"

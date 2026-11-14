@@ -88,7 +88,8 @@ resource "aws_lambda_function" "this" {
   timeout     = 29
   memory_size = 512
 
-  # A cap on what a runaway client can cost, with the stage throttle in front.
+  #checkov:skip=CKV_AWS_115:The account cannot reserve five executions while retaining its required unreserved pool. -1 shares the existing account capacity; the HTTP API keeps its 5 requests/s and burst-10 throttle. Set a positive root input when capacity permits a function-specific cap.
+  # Positive values cap this function; -1 shares the account's remaining pool.
   reserved_concurrent_executions = var.reserved_concurrency
 
   environment {

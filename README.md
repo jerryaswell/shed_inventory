@@ -98,6 +98,15 @@ health route and the served CSP.
 
 The site is then at `terraform output site_url`.
 
+`backend_reserved_concurrency` is explicit in `terraform.tfvars`. It is `-1`
+while the account cannot reserve capacity for this function without consuming
+its required unreserved pool. The function shares the account's capacity and
+has no individual concurrency cap; other functions can contend for that pool.
+The HTTP API still throttles at 5 requests per second with a burst of 10.
+The plan job reports available Lambda capacity. Once a reservation fits, set
+a positive whole number to reserve and cap this function; zero is refused
+because it disables the API.
+
 ## The phone
 
 A Galaxy Note 10 running **Fully Kiosk Browser** (Play Store; the kiosk
