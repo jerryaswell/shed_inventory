@@ -11,11 +11,11 @@ let root;
 let hidden;
 let media;
 
-function MotionExample({ sleeping = false }) {
-  const motion = useAmbientMotion({ sleeping });
+function MotionExample() {
+  const motion = useAmbientMotion();
   return (
     <>
-      <AmbientBackground paused={motion.paused} sleeping={sleeping} />
+      <AmbientBackground paused={motion.paused} />
       <button type="button" onClick={motion.togglePause} disabled={motion.reducedMotion} aria-pressed={motion.userPaused}>
         Pause background
       </button>
@@ -44,7 +44,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const mount = async (props = {}) => act(async () => root.render(<StrictMode><MotionExample {...props} /></StrictMode>));
+const mount = async () => act(async () => root.render(<StrictMode><MotionExample /></StrictMode>));
 const paused = () => host.querySelector('.ambient-background').dataset.paused === 'true';
 const button = () => host.querySelector('button');
 const toggle = async () => act(async () => button().click());
@@ -118,23 +118,8 @@ test('visibility stops motion immediately and restores only an unpaused backgrou
   expect(paused()).toBe(true);
 });
 
-test('sleep hides the colour fields and stops motion without changing the saved choice', async () => {
-  await mount({ sleeping: true });
-  expect(paused()).toBe(true);
-  expect(host.querySelector('.ambient-background').dataset.sleeping).toBe('true');
-  expect(window.localStorage.getItem(AMBIENT_PAUSE_KEY)).toBe('false');
-
-  await mount({ sleeping: false });
-  expect(paused()).toBe(false);
-  await toggle();
-  await mount({ sleeping: true });
-  await mount({ sleeping: false });
-  expect(paused()).toBe(true);
-});
-
-test('the decorative component enforces sleep even if passed an unpaused state', async () => {
-  await act(async () => root.render(<AmbientBackground paused={false} sleeping />));
-  expect(paused()).toBe(true);
+test('the decorative background is hidden from assistive technology and has no focusable controls', async () => {
+  await act(async () => root.render(<AmbientBackground />));
   expect(host.querySelector('.ambient-background').getAttribute('aria-hidden')).toBe('true');
   expect(host.querySelectorAll('button, a, input, [tabindex]')).toHaveLength(0);
 });

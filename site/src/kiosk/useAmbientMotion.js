@@ -47,14 +47,15 @@ function subscribeVisibility(onChange) {
 }
 
 /**
- * Pass paused and sleeping to AmbientBackground. Only userPaused is stored,
- * under AMBIENT_PAUSE_KEY; forced stops never replace the explicit preference.
+ * Pass paused to AmbientBackground on both the home and lock screens.
+ * Only userPaused is stored under AMBIENT_PAUSE_KEY; forced stops never
+ * replace the explicit preference.
  * Storage restrictions leave the current session's toggle usable.
  *
  * A pause control uses togglePause and userPaused. Disable it while
  * reducedMotion is true and explain that the device preference stops motion.
  */
-export function useAmbientMotion({ sleeping = false } = {}) {
+export function useAmbientMotion() {
   const [userPaused, setUserPaused] = useState(readPaused);
   const reducedMotion = useSyncExternalStore(subscribeReducedMotion, getReducedMotion, getServerSnapshot);
   const hidden = useSyncExternalStore(subscribeVisibility, getHidden, getServerSnapshot);
@@ -70,7 +71,7 @@ export function useAmbientMotion({ sleeping = false } = {}) {
   const togglePause = useCallback(() => setUserPaused((paused) => !paused), []);
 
   return {
-    paused: userPaused || reducedMotion || hidden || sleeping,
+    paused: userPaused || reducedMotion || hidden,
     userPaused,
     reducedMotion,
     hidden,
