@@ -50,3 +50,8 @@ test('every line of the demo script, in order, gets an answer', () => {
     if (r.change) items = applyChange(items, r.change);
   }
 });
+
+test('a count left of a unit with an irregular plural reads correctly', () => {
+  const items = sampleInventory.map((i) => (i.id === 'screws-deck' ? { ...i, quantity: 3 } : i));
+  expect(interpret('taking a box of deck screws', items).reply).toContain('2 boxes left');
+});

@@ -9,7 +9,7 @@
  * for the backend's voice route is what makes it work.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Pause, Play, Search, Undo2 } from 'lucide-react';
 import { loadConfig } from './core/config.js';
 import { checkHealth } from './core/api.js';
 import { applyChange, inverseOf } from './core/inventory.js';
@@ -21,6 +21,9 @@ import Reply from './kiosk/Reply.jsx';
 import SearchSheet from './kiosk/SearchSheet.jsx';
 import Screensaver from './kiosk/Screensaver.jsx';
 import { useNow } from './kiosk/useNow.js';
+import AmbientBackground from './kiosk/AmbientBackground.jsx';
+import { useAmbientMotion } from './kiosk/useAmbientMotion.js';
+import { useFocusRescue } from './kiosk/useFocusRescue.js';
 
 const UNDO_MS = 10_000;
 const IDLE_MS = 90_000;
@@ -47,6 +50,11 @@ export default function App({
   const timer = useRef(null);
   const heardNext = useRef(null);
   const scriptAt = useRef(0);
+  const micRef = useRef(null);
+  const replyRef = useRef(null);
+  // The answer, or the mic when there is none. The browse dialog keeps its own.
+  const fallbackRef = result ? replyRef : micRef;
+  const onFocus = useFocusRescue(fallbackRef, { ignore: (el) => el.closest('dialog') != null });
 
   useEffect(() => {
     itemsRef.current = items;
@@ -91,6 +99,7 @@ export default function App({
   };
 
   const onMic = () => {
+    if (phase === 'thinking') return;
     if (phase === 'listening') {
       hear(heardNext.current);
       return;
@@ -102,11 +111,6 @@ export default function App({
     setPhase('listening');
     clearTimeout(timer.current);
     timer.current = setTimeout(() => hear(heardNext.current), listenMs);
-  };
-
-  const onTry = (sentence) => {
-    setResult(null);
-    hear(sentence);
   };
 
   const onPick = (itemId) => {
@@ -128,43 +132,67 @@ export default function App({
     }
     setItems((cur) => applyChange(cur, undo.change));
     setUndo(null);
-    setResult({ action: 'undone', heard: null, reply: 'Undone. The count is back to what it was.' });
+    setResult({ action: 'undone', heard: null, itemId: undo.change.itemId, reply: 'Last change undone.' });
   };
 
   // The clock ticks every half second, so it can trail the moment Undo was set.
   const undoLeft = undo ? Math.min(UNDO_MS / 1000, Math.max(0, Math.ceil((undo.until - now) / 1000))) : 0;
   const busy = phase === 'listening' || phase === 'thinking';
   const sleeping = !sheetOpen && !busy && now - lastTouch > IDLE_MS;
+  const motion = useAmbientMotion({ sleeping });
+  const MotionIcon = motion.userPaused ? Play : Pause;
 
   return (
-    <div className="kiosk" onPointerDownCapture={() => setLastTouch(clock())}>
-      <StatusBar status={status} now={now} />
-      <p className="banner">Mockup: sample inventory, nothing is saved, and the mic plays a script.</p>
+    <div
+      className="kiosk"
+      onPointerDownCapture={() => setLastTouch(clock())}
+      onKeyDownCapture={() => setLastTouch(clock())}
+      onFocus={onFocus}
+    >
+      <AmbientBackground paused={motion.paused} sleeping={sleeping} />
+      <div className="kiosk-content">
+        <StatusBar status={status} now={now} controls={
+          <button
+            type="button"
+            className="motion-toggle"
+            onClick={motion.togglePause}
+            disabled={motion.reducedMotion}
+            aria-label={motion.reducedMotion ? 'Motion off: device prefers reduced motion' : undefined}
+            title={motion.reducedMotion ? 'Your device prefers reduced motion' : undefined}
+          >
+            <MotionIcon size={18} aria-hidden="true" />
+            {motion.reducedMotion ? 'Motion off' : motion.userPaused ? 'Resume motion' : 'Pause motion'}
+          </button>
+        } />
+        <p className="banner">Sample inventory. Nothing is saved. No audio is recorded.</p>
 
-      <main className="stage">
-        <MicButton phase={phase} onTap={onMic} compact={result != null} />
-        {result ? (
-          <Reply result={result} items={items} undoLeft={sheetOpen ? 0 : undoLeft} onUndo={onUndo} onPick={onPick} />
-        ) : (
-          phase === 'idle' && (
-            <section className="try">
-              <p className="try-label">Try saying</p>
-              <div className="try-list">
-                {demoScript.map((s) => (
-                  <button type="button" key={s} className="chip" onClick={() => onTry(s)}>
-                    {s}
-                  </button>
-                ))}
-              </div>
+        <main className={`stage${result ? ' stage-result' : ''}`} aria-label="Inventory demo">
+          <MicButton phase={phase} onTap={onMic} compact={result != null} buttonRef={micRef} />
+          {/* Always mounted, so an answer is announced: a live region that
+              arrives together with its content often is not. */}
+          <div className="reply-region" aria-live="polite" aria-atomic="true">
+            {result && <Reply result={result} items={items} onPick={onPick} sectionRef={replyRef} />}
+          </div>
+          {!result && phase === 'idle' && (
+            <section className="example" aria-label="Sample request">
+              <p className="example-label">First sample</p>
+              <p className="example-text">“{demoScript[0]}”</p>
             </section>
-          )
-        )}
-      </main>
+          )}
+        </main>
+      </div>
 
       <footer className="foot">
-        <button type="button" className="search-btn" onClick={() => setSheetOpen(true)}>
+        {undoLeft > 0 && !sheetOpen && (
+          <button type="button" className="undo" onClick={onUndo}>
+            <Undo2 size={24} aria-hidden="true" />
+            Undo
+            <span className="undo-left" aria-hidden="true">{undoLeft}s</span>
+          </button>
+        )}
+        <button type="button" className="search-btn" aria-haspopup="dialog" onClick={() => setSheetOpen(true)}>
           <Search size={24} aria-hidden="true" />
-          Search or browse
+          Browse items
         </button>
       </footer>
 

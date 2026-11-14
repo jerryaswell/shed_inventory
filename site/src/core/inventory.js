@@ -31,10 +31,15 @@ export function inverseOf(change, before) {
   return { itemId: change.itemId, delta: before.quantity - Math.max(0, before.quantity + change.delta) };
 }
 
+/** "box" → "boxes", "bulb" → "bulbs": the English rule for the units in use. */
+export function plural(unit) {
+  return /(s|x|z|ch|sh)$/.test(unit) ? `${unit}es` : `${unit}s`;
+}
+
 /** "12 bulbs", "1 box", or "in the shed" / "out" for a tool. */
 export function describeStock(item) {
   if (item.kind === 'tool') return item.out ? 'out of the shed' : 'in the shed';
-  const unit = item.quantity === 1 ? item.unit : `${item.unit}s`;
+  const unit = item.quantity === 1 ? item.unit : plural(item.unit);
   return `${item.quantity} ${unit}`;
 }
 

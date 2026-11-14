@@ -1,30 +1,35 @@
 /**
- * The one big control. Tap to start listening, tap again to stop early. It
- * shrinks while an answer is showing, so the answer fits without scrolling.
+ * The microphone is simulated until the voice route exists. Every label
+ * identifies the sample flow even when the disclosure is off screen.
  */
-import { Mic, Square, Loader } from 'lucide-react';
+import { Mic, ArrowRight, Loader } from 'lucide-react';
 
 const COPY = {
-  idle: 'Tap to speak',
-  answer: 'Tap to speak',
-  listening: 'Listening… tap to stop',
-  thinking: 'Looking…'
+  idle: 'Try a sample',
+  answer: 'Next sample',
+  listening: 'Run sample now',
+  thinking: 'Finding sample items…'
 };
 
-export default function MicButton({ phase, onTap, compact = false }) {
-  const Icon = phase === 'listening' ? Square : phase === 'thinking' ? Loader : Mic;
+export default function MicButton({ phase, onTap, compact = false, buttonRef }) {
+  const Icon = phase === 'listening' ? ArrowRight : phase === 'thinking' ? Loader : Mic;
   return (
-    <div className="mic-wrap">
+    <div className={`mic-wrap${compact ? ' mic-wrap-compact' : ''}`}>
       <button
         type="button"
         className={`mic mic-${phase}${compact ? ' mic-compact' : ''}`}
+        ref={buttonRef}
         onClick={onTap}
-        disabled={phase === 'thinking'}
+        // aria-disabled, not disabled: a disabled button drops keyboard focus.
+        aria-disabled={phase === 'thinking' || undefined}
         aria-label={COPY[phase]}
       >
-        <Icon size={compact ? 64 : 96} strokeWidth={1.75} aria-hidden="true" />
+        <Icon size={compact ? 28 : 52} strokeWidth={1.5} aria-hidden="true" />
       </button>
-      <p className="mic-label">{COPY[phase]}</p>
+      <div className="mic-copy" role="status">
+        <p className="mic-label">{COPY[phase]}</p>
+        {phase === 'listening' && <p className="mic-hint">Preparing a scripted request…</p>}
+      </div>
     </div>
   );
 }
