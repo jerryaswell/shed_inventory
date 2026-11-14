@@ -8,12 +8,14 @@
  */
 import { json } from './respond.js';
 
-const routes = {
-  'GET /health': async () => json(200, { ok: true })
-};
+// A Map, not an object: a routeKey such as "constructor" or "toString" must
+// not find an inherited member and be called as a route.
+const routes = new Map([
+  ['GET /health', async () => json(200, { ok: true })]
+]);
 
 export async function handler(event) {
-  const route = routes[event?.routeKey];
+  const route = routes.get(event?.routeKey);
   if (!route) return json(404, { error: 'not found' });
   try {
     return await route(event);
