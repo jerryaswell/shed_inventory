@@ -16,6 +16,13 @@ test('any other route is a 404', async () => {
   }
 });
 
+test('a routeKey naming an inherited object member is a 404', async () => {
+  for (const routeKey of ['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__']) {
+    const res = await handler({ routeKey });
+    assert.equal(res?.statusCode, 404, routeKey);
+  }
+});
+
 test('an event with no routeKey at all is a 404, not a crash', async () => {
   assert.equal((await handler(undefined)).statusCode, 404);
 });
