@@ -48,8 +48,9 @@ export function isLow(item) {
 }
 
 const words = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
-// "bulbs" finds "bulb", "boxes" finds "box".
-const stem = (w) => w.replace(/(es|s)$/, '');
+// "bulbs" finds "bulb", "boxes" finds "box". A word that is only the suffix
+// ("s", "es") stays as it is: stemmed to "", it would match every word.
+const stem = (w) => w.replace(/(es|s)$/, '') || w;
 
 /** Items whose name, aliases or location match every word of `query`. */
 export function search(items, query) {

@@ -50,6 +50,19 @@ describe('search', () => {
     expect(search(sampleInventory, 'pegboard').length).toBe(2);
   });
 
+  test('a word that is only a suffix still has to match', () => {
+    // "s" and "es" once stemmed to "", which every word starts with.
+    expect(search(sampleInventory, 's').map((i) => i.id)).not.toContain('tape-duct');
+    expect(search(sampleInventory, 's').length).toBe(sampleInventory.length - 1);
+    expect(search(sampleInventory, 'es')).toEqual([]);
+  });
+
+  test('a short word in a longer query is not dropped', () => {
+    expect(search(sampleInventory, 'es drill')).toEqual([]);
+    expect(search(sampleInventory, 'zz drill')).toEqual([]);
+    expect(search(sampleInventory, 's drill').map((i) => i.id)).toEqual(['drill-cordless']);
+  });
+
   test('an empty query is everything', () => {
     expect(search(sampleInventory, '  ')).toBe(sampleInventory);
   });
