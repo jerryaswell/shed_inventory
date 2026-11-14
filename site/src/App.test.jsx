@@ -264,6 +264,65 @@ test('the screensaver comes on after a minute and a half untouched, and a tap wa
   expect(host.querySelector('.ambient-background').dataset.paused).toBe('false');
 });
 
+/**
+ * Press a key on whatever has focus, and do what a browser does with a button
+ * when the page does not cancel it: Enter presses it on keydown, Space on
+ * keyup. jsdom does neither by itself.
+ */
+const pressKey = async (key) => {
+  const target = document.activeElement;
+  const down = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  await act(async () => target.dispatchEvent(down));
+  if (key === 'Enter' && !down.defaultPrevented && target.isConnected) await act(async () => target.click());
+  const upTarget = document.activeElement;
+  const up = new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true });
+  await act(async () => upTarget.dispatchEvent(up));
+  if (key === ' ' && !down.defaultPrevented && !up.defaultPrevented && upTarget === target) await act(async () => target.click());
+  return { down, up };
+};
+
+test.each([['Enter'], [' ']])('one %j key wakes the screensaver without starting a sample or changing stock', async (key) => {
+  await mount();
+  await speak(); // finds the drill
+  const next = button('Next sample');
+  next.focus();
+  await advance(91_000);
+
+  const saver = host.querySelector('.saver');
+  expect(document.activeElement).toBe(saver);
+  expect(host.querySelector('.kiosk-content').hasAttribute('inert')).toBe(true);
+  expect(host.querySelector('.foot').hasAttribute('inert')).toBe(true);
+
+  const { down, up } = await pressKey(key);
+  expect(down.defaultPrevented).toBe(true);
+  expect(up.defaultPrevented).toBe(true);
+  await advance(3_000);
+  expect(host.querySelector('.saver')).toBeNull();
+  expect(host.querySelector('.kiosk-content').hasAttribute('inert')).toBe(false);
+  expect(document.activeElement).toBe(next);
+  expect(button('Next sample')).toBeDefined();
+  expect(host.querySelector('.reply-summary').textContent).toBe('Found');
+  expect(host.querySelector('.reply-stock').textContent).toBe('In the shed');
+  expect(button('Undo')).toBeUndefined();
+
+  // Awake again, the same key presses the control as usual.
+  await pressKey(key);
+  await advance(1_100);
+  expect(host.querySelector('.reply-summary').textContent).toBe('Taken');
+});
+
+test('waking with nothing focused puts focus on the answer, not the page body', async () => {
+  await mount();
+  await speak();
+  document.activeElement.blur();
+  await advance(91_000);
+  expect(document.activeElement).toBe(host.querySelector('.saver'));
+  await pressKey('Escape');
+  await advance(500);
+  expect(host.querySelector('.saver')).toBeNull();
+  expect(document.activeElement).toBe(host.querySelector('.reply'));
+});
+
 test('home has one sample action, one example, and a persistent browse entry', async () => {
   await mount();
   expect(host.querySelectorAll('.stage button')).toHaveLength(1);
