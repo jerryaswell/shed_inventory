@@ -1,6 +1,7 @@
 /*
  * Stable charcoal surfaces keep controls readable over the ambient background.
- * The content scrolls independently so Browse and Undo remain reachable.
+ * The content scrolls independently so Browse and connection status remain
+ * reachable.
  */
 :root {
   --bg: #080b12;
@@ -10,7 +11,6 @@
   --text: #eef2f7;
   --muted: #a8b6c8;
   --accent: #b8c7ff;
-  --listen: #91c7cb;
   --ok: #96d7bc;
   --warn: #f0c688;
   /* What a focus outline reaches past its control: 3px wide plus a 4px offset,
@@ -65,18 +65,23 @@ button svg { flex-shrink: 0; }
   scroll-padding: var(--focus-gutter);
 }
 
-/* ---- status line ---- */
-.status { flex-shrink: 0; padding: 16px 0 10px; }
-.status-heading, .status-details { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.status-heading { justify-content: space-between; }
-.status-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font-size: 1.25rem; font-weight: 650; }
-.status-demo { padding: 3px 8px; border-radius: 6px; background: var(--panel-2); color: var(--accent); font-size: 0.75rem; font-weight: 600; }
-.status-controls { display: flex; align-items: center; }
-.motion-toggle {
+/* ---- top controls ---- */
+.top-bar {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 0 10px;
+}
+.top-control {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
   min-height: 48px;
   padding: 8px 12px;
   border: 1px solid var(--line);
@@ -84,24 +89,25 @@ button svg { flex-shrink: 0; }
   background: var(--panel);
   font-size: 0.8rem;
 }
-.status-details { margin-top: 8px; color: var(--muted); font-size: 0.8rem; }
-.status-time { margin-left: auto; font-variant-numeric: tabular-nums; }
-.status-conn { display: flex; align-items: center; gap: 8px; }
+.top-control span { min-width: 0; overflow-wrap: anywhere; }
+.motion-toggle { margin-left: auto; }
+
+/* ---- bottom status bar ---- */
+.status {
+  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 4px 0;
+  border-top: 1px solid rgb(133 152 180 / 0.25);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.status-conn { display: flex; justify-content: center; align-items: center; gap: 8px; }
+.status-conn > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .status-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
 .status-online .status-dot { background: var(--ok); }
 .status-offline .status-dot,
 .status-unavailable .status-dot { background: var(--warn); }
-
-.banner {
-  flex-shrink: 0;
-  margin: 0;
-  padding: 9px 12px;
-  border-radius: 10px;
-  background: var(--panel);
-  color: var(--muted);
-  font-size: 0.8rem;
-  overflow-wrap: anywhere;
-}
 
 /* ---- the stage ---- */
 .stage {
@@ -109,13 +115,11 @@ button svg { flex-shrink: 0; }
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 28px;
   padding: 28px 4px 20px;
 }
 .stage > * { flex-shrink: 0; max-width: 100%; }
-.stage:not(.stage-result) { justify-content: center; }
-.stage-result { gap: 14px; padding-top: 14px; }
-
 .mic-wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; }
 .mic {
   flex-shrink: 0;
@@ -128,97 +132,20 @@ button svg { flex-shrink: 0; }
   display: grid;
   place-items: center;
   box-shadow: 0 0 0 8px rgb(184 199 255 / 0.05);
-  transition: transform 0.15s;
 }
-.mic:active { transform: scale(0.96); }
-.mic-compact { width: 52px; height: 52px; box-shadow: none; }
-.mic-wrap-compact { flex-direction: row; gap: 14px; }
-.mic-listening { border-color: var(--listen); color: var(--listen); animation: pulse 1.8s ease-in-out infinite; }
-.mic-thinking { color: var(--muted); cursor: default; }
-.mic-thinking svg { animation: spin 1.5s linear infinite; }
+.mic-unavailable { border-color: var(--line); color: var(--muted); box-shadow: none; }
 .mic-copy { min-width: 0; text-align: center; }
-.mic-label { margin: 0; font-size: 1.15rem; font-weight: 600; overflow-wrap: anywhere; }
-.mic-hint { margin: 6px 0 0; color: var(--muted); font-size: 0.85rem; }
-.mic-wrap-compact .mic-label { font-size: 1rem; }
-
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 8px rgb(145 199 203 / 0.08); }
-  50% { box-shadow: 0 0 0 16px rgb(145 199 203 / 0.02); }
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* Always mounted (it is the live region); out of the flow while empty so the
-   stage's gap does not count it. */
-.reply-region { width: 100%; }
-.reply-region:empty { position: absolute; }
-.reply:focus { outline: none; }
-.reply:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
-
-/* ---- sample request ---- */
-.example { width: 100%; padding: 0 12px; text-align: center; }
-.example-label { margin: 0 0 8px; color: var(--muted); font-size: 0.8rem; }
-.example-text { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
-.chip {
-  border: 1px solid var(--line);
-  background: var(--panel-2);
-  border-radius: 14px;
-  padding: 12px 16px;
-  font-size: 1rem;
-}
-.chip-big { width: 100%; text-align: left; overflow-wrap: anywhere; }
-
-/* ---- the answer ---- */
-.reply {
-  width: 100%;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow-wrap: anywhere;
-}
-.reply-heard { margin: 0; color: var(--muted); font-size: 0.85rem; }
-.reply-text { margin: 0; font-size: 1.15rem; line-height: 1.35; font-weight: 600; }
-.reply-summary { margin: 0 0 4px; color: var(--muted); font-size: 0.8rem; }
-.reply-name { margin: 0; font-size: 1.3rem; line-height: 1.25; font-weight: 650; }
-.reply-item { display: flex; flex-wrap: wrap; align-items: start; gap: 14px 20px; }
-.reply-location { flex: 1 1 10rem; min-width: 0; display: flex; align-items: start; gap: 8px; }
-.reply-location > svg { flex-shrink: 0; margin-top: 3px; color: var(--accent); }
-.reply-location > div { min-width: 0; }
-.reply-where { font-size: 1.1rem; font-weight: 600; }
-.reply-spot { color: var(--muted); font-size: 0.95rem; }
-.reply-stock { display: flex; flex-direction: column; gap: 4px; font-size: 1.1rem; font-weight: 600; }
-.reply-stock.low { color: var(--warn); }
-.reply-low { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 400; }
-.reply-low svg { flex-shrink: 0; }
-.reply-options { display: flex; flex-direction: column; gap: 10px; }
-
-.undo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid var(--accent);
-  background: var(--panel-2);
-  color: var(--text);
-  border-radius: 12px;
-  padding: 12px;
-  font-size: 1rem;
-  font-weight: 600;
-}
-.undo-left { color: var(--muted); font-size: 0.8rem; font-weight: 400; font-variant-numeric: tabular-nums; }
+.mic-label { margin: 0; color: var(--muted); font-size: 1rem; font-weight: 500; overflow-wrap: anywhere; }
 
 /* ---- persistent actions ---- */
 .foot {
   flex-shrink: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 10px;
   padding: 10px 0 16px;
 }
-.foot > button { flex: 1 1 7rem; min-width: 0; }
+.foot > button { width: 100%; min-width: 0; }
 .search-btn {
   display: flex;
   align-items: center;
@@ -232,10 +159,9 @@ button svg { flex-shrink: 0; }
 }
 
 @media (max-height: 650px) {
-  .status { padding-top: 10px; }
+  .top-bar { padding-top: 10px; }
   .stage { gap: 20px; padding-top: 20px; }
-  .stage-result { gap: 10px; padding-top: 10px; }
-  .mic:not(.mic-compact) { width: 120px; height: 120px; }
+  .mic { width: 120px; height: 120px; }
   .foot { padding-bottom: 10px; }
 }
 
@@ -257,9 +183,9 @@ button svg { flex-shrink: 0; }
   border: none;
   background: transparent;
 }
-.saver-clock {
+.saver-content {
   /* Transform percentages subtract this group's own dimensions, so even a
-     changing clock or viewport stays inside the safe margins without JS. */
+     changing viewport stays inside the safe margins without JS. */
   --travel-x: max(0px, calc(var(--saver-width) - 100% - var(--saver-left) - var(--saver-right)));
   --travel-y: max(0px, calc(var(--saver-height) - 100% - var(--saver-top) - var(--saver-bottom)));
   position: absolute;
@@ -270,16 +196,13 @@ button svg { flex-shrink: 0; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-size: 56px;
-  font-weight: 300;
-  color: var(--text);
   text-align: center;
-  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
   transform: translate(calc(var(--travel-x) * 0.5), calc(var(--travel-y) * 0.5));
   animation: saver-drift 240s ease-in-out infinite;
   will-change: transform;
 }
-.saver-hint { font-size: 15px; color: var(--muted); margin-top: 6px; }
+.saver-hint { font-size: 1rem; color: var(--muted); }
 
 @supports (height: 100dvh) {
   .saver { --saver-width: 100dvw; --saver-height: 100dvh; }
@@ -293,14 +216,11 @@ button svg { flex-shrink: 0; }
   80% { transform: translate(calc(var(--travel-x) * 0.15), 0px); }
 }
 
-.saver[data-paused='true'] .saver-clock {
+.saver[data-paused='true'] .saver-content {
   animation-play-state: paused;
   will-change: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mic, .mic-thinking svg, .saver-clock { animation: none; }
-  .mic { transition: none; }
-  .saver-clock { will-change: auto; }
-  .mic:active { transform: none; }
+  .saver-content { animation: none; will-change: auto; }
 }

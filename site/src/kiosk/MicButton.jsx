@@ -1,34 +1,19 @@
-/**
- * The microphone is simulated until the voice route exists. Every label
- * identifies the sample flow even when the disclosure is off screen.
- */
-import { Mic, ArrowRight, Loader } from 'lucide-react';
+/** A health response cannot enable voice before its authenticated route exists. */
+import { Mic } from 'lucide-react';
 
-const COPY = {
-  idle: 'Try a sample',
-  answer: 'Next sample',
-  listening: 'Run sample now',
-  thinking: 'Finding sample items…'
-};
-
-export default function MicButton({ phase, onTap, compact = false, buttonRef }) {
-  const Icon = phase === 'listening' ? ArrowRight : phase === 'thinking' ? Loader : Mic;
+export default function MicButton() {
   return (
-    <div className={`mic-wrap${compact ? ' mic-wrap-compact' : ''}`}>
+    <div className="mic-wrap">
       <button
         type="button"
-        className={`mic mic-${phase}${compact ? ' mic-compact' : ''}`}
-        ref={buttonRef}
-        onClick={onTap}
-        // aria-disabled, not disabled: a disabled button drops keyboard focus.
-        aria-disabled={phase === 'thinking' || undefined}
-        aria-label={COPY[phase]}
+        className="mic mic-unavailable"
+        disabled
+        aria-label="Voice input unavailable"
       >
-        <Icon size={compact ? 28 : 52} strokeWidth={1.5} aria-hidden="true" />
+        <Mic size={52} strokeWidth={1.5} aria-hidden="true" />
       </button>
-      <div className="mic-copy" role="status">
-        <p className="mic-label">{COPY[phase]}</p>
-        {phase === 'listening' && <p className="mic-hint">Preparing a scripted request…</p>}
+      <div className="mic-copy">
+        <p className="mic-label">Voice input unavailable</p>
       </div>
     </div>
   );

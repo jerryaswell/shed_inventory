@@ -1,17 +1,16 @@
 # shed_inventory
 
-An inventory for the shed, run from an old phone mounted inside the door. You
-tap one big button and speak: *"Where's the cordless drill?"*, *"I'm taking
-three lightbulbs"*, *"Returning the drill"*. The kiosk answers and updates the
-count, and every change gets an Undo.
+An inventory for the shed, run from an old phone mounted inside the door. The
+planned voice flow will find items and record changes, with an Undo for each
+change.
 
-**Where it stands:** the infrastructure is real, and the interface is a
-mockup. The page runs on a sample inventory held in memory. The mic records
-nothing: each tap "hears" the next line of a script, so the whole flow can be
-tried on the phone. The backend has a single health route. Real voice, real
-data and the kiosk's sign-in come next (see [What comes next](#what-comes-next)).
+**Where it stands:** the infrastructure and kiosk shell are ready for the
+live backend. The API has a single health route. Voice input is unavailable,
+and Browse shows that inventory is unavailable until data routes are connected.
+The app contains no seeded inventory, scripted requests or local-only stock
+changes. Sign-in, inventory and voice come next (see [What comes next](#what-comes-next)).
 
-## Trying the mockup
+## Running locally
 
 ```bash
 npm install
@@ -24,9 +23,10 @@ npm run dev
 Open http://localhost:5173. The dev server also listens on your network, so
 the phone can open `http://<laptop-ip>:5173` over Wi-Fi.
 
-Use **Try a sample** to run the scripted requests, or **Browse items** to search
-and adjust the sample inventory. Each change offers Undo for ten seconds. API
-connectivity is shown separately from the sample-data disclosure.
+**Home** returns from Browse to the main screen. API connectivity appears in
+the bottom status bar; a successful health check does not enable voice or
+inventory. No microphone access or inventory request is made yet. The phone's
+system clock supplies the time; the app does not display another clock.
 
 **Pause motion** stops the background and drifting lock-screen text, and
 remembers the setting on that browser. The home and lock screens share the same
@@ -40,17 +40,16 @@ site/                        the kiosk page; Vite builds it into dist/
   index.html
   src/
     main.jsx                 boot
-    App.jsx                  the kiosk: mic, answer, Undo, search, screensaver
+    App.jsx                  the kiosk shell: navigation, health, idle and wake
     styles.css               dark, large, for arm's length in a dim shed
     core/
       inventory.js           items, and changes as records that can be undone
-      config.js              /config.json, which the deploy writes; none = sample mode
+      config.js              /config.json, which the deploy writes; none = unconfigured
       api.js                 calls to the backend (the health check so far)
-    kiosk/                   the sample button, answer card, browse dialog, Undo,
-                               ambient background, screensaver, status line
-    mock/
-      sampleInventory.js     a made-up shed, and the mic's script
-      assistant.js           stands in for the voice route, in its shape
+    kiosk/                   Home and motion controls, unavailable microphone,
+                               read-only Browse, ambient background, screensaver,
+                               bottom connection status
+    test/fixtures/           synthetic inventory imported only by tests
 backend/                     the API: one Lambda behind an HTTP API
   src/handler.js             routes; only GET /health so far
   esbuild.config.js          bundles to dist/handler.mjs for nodejs24.x
@@ -131,9 +130,9 @@ features need its one-time Plus licence). It is set up entirely on the phone:
   battery** (stops charging at 85%), and set a weekly auto restart.
 
 After a minute and a half untouched, the controls hide behind a lock screen
-with the same ambient background. The time and “Tap anywhere” drift together
-across the screen on a slow four-minute path, inside safe margins. The
-background pulses gently over 34 to 58 seconds, independently of the slower
+with the same ambient background. “Tap anywhere” drifts across the screen on
+a slow four-minute path, inside safe margins. The background pulses gently
+over 34 to 58 seconds, independently of the slower
 drift. Pause motion and reduced-motion preferences apply on both screens. Check
 smoothness, heat, battery use and Android text scaling on the actual phone
 before leaving the animated background running for long periods.
@@ -150,9 +149,9 @@ before leaving the animated background running for long periods.
 3. **The inventory routes**, over the records in `site/src/core/inventory.js`.
 4. **The voice route.** Upload the audio, convert it to text, and send the
    text and the inventory to a language model. The model picks an item and an
-   action from the list, in the shape `site/src/mock/assistant.js` answers in.
-   The backend checks the pick and applies it. The model's API key goes in
-   Secrets Manager, readable by the function alone.
+   action from the list. Define and validate the response contract before
+   connecting it to the interface. The backend checks the pick and applies it.
+   The model's API key goes in Secrets Manager, readable by the function alone.
 
 ## Local checks
 

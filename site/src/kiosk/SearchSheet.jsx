@@ -1,84 +1,68 @@
 /**
- * Search and browse by hand, for when voice is not the easier way, or the
- * network is down. Big ± buttons for stock, In/Out for tools.
+ * A null inventory means that no inventory service is connected. An empty
+ * array is a loaded inventory with no items; a successful health check alone
+ * cannot establish either its contents or permission to change them.
  *
- * While the kiosk sleeps the sheet is `suspended`: a modal dialog sits in the
- * top layer, above anything the page can stack over it, so the screensaver
- * cannot cover it. The dialog is closed instead, and stays mounted, so the
- * search and the list are as they were when it opens again on waking.
+ * Native modal dialogs live above the screensaver. Suspend the dialog while
+ * asleep, keeping its search, scroll and focused control for waking.
  */
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { X, Minus, Plus, Search } from 'lucide-react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
 import { byArea, describeStock, isLow, search } from '../core/inventory.js';
 import { useFocusRescue } from './useFocusRescue.js';
-import UndoButton from './UndoButton.jsx';
+import TopBar from './TopBar.jsx';
+import StatusBar from './StatusBar.jsx';
 import './SearchSheet.css';
 
-export default function SearchSheet({ items, onClose, onChange, notice, undoUntil = null, clock = Date.now, onUndo, suspended = false }) {
+export default function SearchSheet({ items = null, onClose, onHome, suspended = false, status, motion }) {
   const [query, setQuery] = useState('');
   const dialogRef = useRef(null);
   const contentRef = useRef(null);
   const titleRef = useRef(null);
   const resume = useRef(null);
+  const restoreOpener = useRef(true);
   const titleId = useId();
   const descriptionId = useId();
   const searchId = useId();
-  const groups = byArea(search(items, query));
-  const hasUndo = undoUntil != null;
-  // When Undo is used or runs out while focused, focus returns to the title.
-  const onFocus = useFocusRescue(titleRef);
+  const groups = items == null ? [] : byArea(search(items, query));
+  const onFocus = useFocusRescue(titleRef, { scrollerRef: contentRef });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement;
-    dialog.showModal();
-    // The title, not the search field: focusing a field raises the on-screen
-    // keyboard on the kiosk's touchscreen and hides half the list.
-    titleRef.current.focus({ preventScroll: true });
     return () => {
       dialog.close();
-      if (opener?.isConnected) opener.focus({ preventScroll: true });
+      // Home owns the destination focus; Escape restores the Browse opener.
+      if (restoreOpener.current && opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
 
-  // Closing the dialog hands focus back to the page and drops the list's
-  // scroll position, so both are kept here and put back when it reopens.
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
     if (suspended) {
-      const active = document.activeElement;
-      resume.current = { focus: dialog.contains(active) ? active : null, scroll: contentRef.current.scrollTop };
-      dialog.close();
+      if (dialog.open) {
+        const active = document.activeElement;
+        resume.current = { focus: dialog.contains(active) ? active : null, scroll: contentRef.current.scrollTop };
+        dialog.close();
+      }
       return;
     }
-    if (!resume.current) return;
-    const { focus, scroll } = resume.current;
-    resume.current = null;
     dialog.showModal();
-    contentRef.current.scrollTop = scroll;
-    // A control that went away meanwhile (Undo running out) leaves the title.
-    (focus?.isConnected ? focus : titleRef.current).focus({ preventScroll: true });
+    const previous = resume.current;
+    resume.current = null;
+    contentRef.current.scrollTop = previous?.scroll ?? 0;
+    const control = previous?.focus;
+    // The title keeps the on-screen keyboard closed on first entry. A search
+    // field removed while asleep also falls back to that stable destination.
+    (control?.isConnected && !control.disabled ? control : titleRef.current).focus({ preventScroll: true });
   }, [suspended]);
-
-  useLayoutEffect(() => {
-    const content = contentRef.current;
-    const focused = document.activeElement;
-    if (!content.contains(focused)) return;
-    // Keep the focus outline clear of the edges by the same gutter the
-    // stylesheet scroll-pads with (--focus-gutter).
-    const gutter = parseFloat(getComputedStyle(content).scrollPaddingTop) || 0;
-    const control = focused.getBoundingClientRect();
-    const viewport = content.getBoundingClientRect();
-    if (control.bottom > viewport.bottom - gutter) content.scrollTop += control.bottom - viewport.bottom + gutter;
-    else if (control.top < viewport.top + gutter) content.scrollTop -= viewport.top - control.top + gutter;
-  }, [notice, hasUndo]);
 
   return (
     <dialog
       ref={dialogRef}
       className="sheet"
       aria-labelledby={titleId}
-      aria-describedby={descriptionId}
+      aria-describedby={items == null ? descriptionId : undefined}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -86,84 +70,71 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoUnti
       onFocus={onFocus}
       onKeyDown={(event) => {
         if (event.key !== 'Tab') return;
-        // Every Tab stop, in order. A notice too long for its box scrolls, and
-        // the browser makes that scroller a Tab stop of its own.
-        const stops = [...event.currentTarget.querySelectorAll('button:enabled, input:enabled, .sheet-feedback p')]
-          .filter((stop) => stop.localName !== 'p' || stop.scrollHeight > stop.clientHeight);
+        const stops = [...event.currentTarget.querySelectorAll('button:enabled, input:enabled')];
         const active = document.activeElement;
         const at = stops.indexOf(active);
-        // From the title (not a stop) Shift+Tab would leave the page. Anything
-        // else that is not in the list is left to the browser.
         if (event.shiftKey && (at === 0 || active === titleRef.current)) {
           event.preventDefault();
           stops.at(-1).focus();
-        } else if (!event.shiftKey && at === stops.length - 1) {
+        } else if (!event.shiftKey && (at === stops.length - 1 || (active === titleRef.current && !event.currentTarget.querySelector('input:enabled')))) {
           event.preventDefault();
           stops[0].focus();
         }
       }}
     >
-      <p id={descriptionId} className="sheet-disclosure">Sample inventory. Not saved.</p>
+      <TopBar
+        motion={motion}
+        onHome={() => {
+          restoreOpener.current = false;
+          onHome();
+        }}
+      />
       <div ref={contentRef} className="sheet-content">
         <div className="sheet-head">
-          <div className="sheet-title-row">
-            <h1 id={titleId} ref={titleRef} tabIndex={-1} className="sheet-title">Browse items</h1>
-            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close search">
-              <X size={28} aria-hidden="true" />
-            </button>
-          </div>
-          <div className="sheet-search-field">
-            <label htmlFor={searchId}>Search items</label>
-            <div className="sheet-search">
-              <Search size={22} aria-hidden="true" />
-              <input
-                id={searchId}
-                type="search"
-                placeholder="Name or location"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
+          <h1 id={titleId} ref={titleRef} tabIndex={-1} className="sheet-title">Browse items</h1>
+          {items?.length > 0 && (
+            <div className="sheet-search-field">
+              <label htmlFor={searchId}>Search items</label>
+              <div className="sheet-search">
+                <Search size={22} aria-hidden="true" />
+                <input
+                  id={searchId}
+                  type="search"
+                  placeholder="Name or location"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
         <div className="sheet-list">
-          {groups.length === 0 && <p className="sheet-empty">Nothing matches “{query}”.</p>}
-          {groups.map((g) => (
-            <section key={g.area}>
-              <h2 className="sheet-area">{g.area}</h2>
-              {g.items.map((item) => (
+          {items == null ? (
+            <section className="sheet-unavailable">
+              <h2>Inventory unavailable</h2>
+              <p id={descriptionId}>Items will appear here when inventory is connected.</p>
+            </section>
+          ) : items.length === 0 ? (
+            <p className="sheet-empty">No items yet.</p>
+          ) : groups.length === 0 ? (
+            <p className="sheet-empty">Nothing matches “{query}”.</p>
+          ) : groups.map((group) => (
+            <section key={group.area}>
+              <h2 className="sheet-area">{group.area}</h2>
+              {group.items.map((item) => (
                 <div className="row" key={item.id}>
                   <div className="row-text">
                     <div className="row-name">{item.name}</div>
                     <div className="row-spot">{item.location.spot}</div>
                   </div>
-                  {item.kind === 'stock' ? (
-                    <div className="row-qty">
-                      <button type="button" className="icon-btn" aria-label={`Remove one ${item.unit} from ${item.name}`} onClick={() => onChange({ itemId: item.id, delta: -1 })} disabled={item.quantity === 0}>
-                        <Minus size={24} aria-hidden="true" />
-                      </button>
-                      <span className={`row-count${isLow(item) ? ' low' : ''}`}>{describeStock(item)}</span>
-                      <button type="button" className="icon-btn" aria-label={`Add one ${item.unit} to ${item.name}`} onClick={() => onChange({ itemId: item.id, delta: 1 })}>
-                        <Plus size={24} aria-hidden="true" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button type="button" className={`tool-state${item.out ? ' out' : ''}`} onClick={() => onChange({ itemId: item.id, out: !item.out })} aria-label={`${item.name} is ${describeStock(item)}; tap to change`}>
-                      {item.out ? 'Out' : 'In'}
-                    </button>
-                  )}
+                  <span className={`row-stock${isLow(item) ? ' low' : ''}`}>{describeStock(item)}</span>
                 </div>
               ))}
             </section>
           ))}
         </div>
       </div>
-      {(notice || hasUndo) && (
-        <div className="sheet-feedback">
-          {notice && <p role="status">{notice}</p>}
-          {hasUndo && <UndoButton until={undoUntil} clock={clock} onUndo={onUndo} iconSize={26} />}
-        </div>
-      )}
+      <StatusBar status={status} />
     </dialog>
   );
 }
