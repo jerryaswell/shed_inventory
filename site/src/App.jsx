@@ -8,7 +8,7 @@
  * flow, the screens and the shapes are the real ones; swapping the stand-in
  * for the backend's voice route is what makes it work.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Pause, Play, Search, Undo2 } from 'lucide-react';
 import { loadConfig } from './core/config.js';
 import { checkHealth } from './core/api.js';
@@ -52,9 +52,12 @@ export default function App({
   const scriptAt = useRef(0);
   const micRef = useRef(null);
   const replyRef = useRef(null);
-  // The answer, or the mic when there is none. The browse dialog keeps its own.
+  const saverRef = useRef(null);
+  const wakeFocus = useRef(null);
+  // The answer, or the mic when there is none. The browse dialog keeps its
+  // own, and the saver hands focus back itself (below).
   const fallbackRef = result ? replyRef : micRef;
-  const onFocus = useFocusRescue(fallbackRef, { ignore: (el) => el.closest('dialog') != null });
+  const onFocus = useFocusRescue(fallbackRef, { ignore: (el) => el.closest('dialog, .saver') != null });
 
   useEffect(() => {
     itemsRef.current = items;
@@ -142,15 +145,32 @@ export default function App({
   const motion = useAmbientMotion({ sleeping });
   const MotionIcon = motion.userPaused ? Play : Pause;
 
+  // While asleep the saver holds focus and everything under it is inert, so a
+  // wake key lands on the saver, not on the control that had focus. On waking,
+  // focus goes back to that control, or to the answer or the mic when nothing
+  // had it. Both run after the commit that sets or clears `inert`.
+  useLayoutEffect(() => {
+    if (sleeping) {
+      const active = document.activeElement;
+      wakeFocus.current = active && active !== document.body ? active : (replyRef.current ?? micRef.current);
+      saverRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const control = wakeFocus.current;
+    wakeFocus.current = null;
+    if (control?.isConnected) control.focus({ preventScroll: true });
+  }, [sleeping]);
+
   return (
     <div
       className="kiosk"
       onPointerDownCapture={() => setLastTouch(clock())}
-      onKeyDownCapture={() => setLastTouch(clock())}
+      // Asleep, a key is the saver's to handle: it wakes on the key's release.
+      onKeyDownCapture={() => sleeping || setLastTouch(clock())}
       onFocus={onFocus}
     >
       <AmbientBackground paused={motion.paused} sleeping={sleeping} />
-      <div className="kiosk-content">
+      <div className="kiosk-content" inert={sleeping}>
         <StatusBar status={status} now={now} controls={
           <button
             type="button"
@@ -182,7 +202,7 @@ export default function App({
         </main>
       </div>
 
-      <footer className="foot">
+      <footer className="foot" inert={sleeping}>
         {undoLeft > 0 && !sheetOpen && (
           <button type="button" className="undo" onClick={onUndo}>
             <Undo2 size={24} aria-hidden="true" />
@@ -206,7 +226,7 @@ export default function App({
           onUndo={onUndo}
         />
       )}
-      {sleeping && <Screensaver now={now} onWake={() => setLastTouch(clock())} />}
+      {sleeping && <Screensaver now={now} onWake={() => setLastTouch(clock())} buttonRef={saverRef} />}
     </div>
   );
 }
