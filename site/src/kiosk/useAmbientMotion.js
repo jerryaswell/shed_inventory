@@ -11,12 +11,26 @@ function readPaused() {
   }
 }
 
-const getReducedMotion = () => window.matchMedia?.(REDUCED_MOTION_QUERY).matches ?? false;
+// One MediaQueryList serves every snapshot read and subscription; it is created
+// on first use and again only if window.matchMedia itself is replaced.
+let mediaFactory;
+let mediaQuery = null;
+
+function reducedMotionQuery() {
+  const matchMedia = window.matchMedia;
+  if (matchMedia !== mediaFactory) {
+    mediaFactory = matchMedia;
+    mediaQuery = matchMedia ? matchMedia.call(window, REDUCED_MOTION_QUERY) : null;
+  }
+  return mediaQuery;
+}
+
+const getReducedMotion = () => reducedMotionQuery()?.matches ?? false;
 const getHidden = () => document.hidden;
 const getServerSnapshot = () => false;
 
 function subscribeReducedMotion(onChange) {
-  const query = window.matchMedia?.(REDUCED_MOTION_QUERY);
+  const query = reducedMotionQuery();
   if (!query) return () => {};
   if (query.addEventListener) {
     query.addEventListener('change', onChange);

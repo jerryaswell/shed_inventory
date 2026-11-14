@@ -208,3 +208,27 @@ test('older WebView media listeners also update and clean up', async () => {
   await act(async () => root.render(null));
   expect(legacyMedia.removeListener).toHaveBeenCalledWith(listener);
 });
+
+test('snapshot reads and subscriptions share one MediaQueryList', async () => {
+  await mount();
+  await setReducedMotion(true);
+  expect(paused()).toBe(true);
+  await setHidden(true);
+  await setHidden(false);
+  await setReducedMotion(false);
+  expect(paused()).toBe(false);
+  await toggle();
+  expect(paused()).toBe(true);
+  await toggle();
+  expect(paused()).toBe(false);
+  expect(window.matchMedia).toHaveBeenCalledTimes(1);
+  expect(window.matchMedia).toHaveBeenCalledWith('(prefers-reduced-motion: reduce)');
+
+  await act(async () => root.render(null));
+  expect(media.addEventListener.mock.calls.length).toBeGreaterThan(0);
+  for (const [event, listener] of media.addEventListener.mock.calls) {
+    expect(media.removeEventListener).toHaveBeenCalledWith(event, listener);
+  }
+  await mount();
+  expect(window.matchMedia).toHaveBeenCalledTimes(1);
+});
