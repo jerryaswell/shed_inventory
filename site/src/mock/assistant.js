@@ -52,13 +52,24 @@ export function resolve(item, action, quantity, heard) {
       reply: out ? `Marked the ${item.name.toLowerCase()} as out. Put it back on ${where(item)}.` : `Thanks. The ${item.name.toLowerCase()} goes back on ${where(item)}.`
     };
   }
-  const delta = action === 'take' ? -quantity : quantity;
-  const left = Math.max(0, item.quantity + delta);
+  // The model stops a count at zero; the answer says what actually moved, so
+  // it never claims more were taken than were there. With none there, nothing
+  // moves and it says so, as a tool already marked out does.
+  const moved = action === 'take' ? Math.min(quantity, item.quantity) : quantity;
+  if (moved <= 0) {
+    return {
+      action: 'unknown', heard, itemId: item.id,
+      reply: action === 'take' ? `There are no ${item.name.toLowerCase()} left to take.` : 'Nothing to put back.'
+    };
+  }
+  const delta = action === 'take' ? -moved : moved;
+  const left = item.quantity + delta;
   const unit = left === 1 ? item.unit : plural(item.unit);
   const verb = action === 'take' ? 'Took' : 'Put back';
+  const short = moved < quantity ? `Only ${moved} ${moved === 1 ? item.unit : plural(item.unit)} there. ` : '';
   return {
     action, heard, itemId: item.id, change: { itemId: item.id, delta },
-    reply: `${verb} ${quantity} × ${item.name}. ${left} ${unit} left.${item.lowAt != null && left <= item.lowAt ? ' Running low.' : ''}`
+    reply: `${short}${verb} ${moved} × ${item.name}. ${left} ${unit} left.${item.lowAt != null && left <= item.lowAt ? ' Running low.' : ''}`
   };
 }
 

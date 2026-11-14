@@ -86,8 +86,10 @@ export default function App({
   const answer = (next) => {
     if (next.change) {
       const before = itemsRef.current.find((i) => i.id === next.change.itemId);
+      const inverse = inverseOf(next.change, before);
       setItems((cur) => applyChange(cur, next.change));
-      setUndo({ change: inverseOf(next.change, before), until: clock() + UNDO_MS });
+      // A change that moved nothing has nothing to undo.
+      setUndo(inverse.delta === 0 ? null : { change: inverse, until: clock() + UNDO_MS });
     } else {
       setUndo(null);
     }

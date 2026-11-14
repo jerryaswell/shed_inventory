@@ -121,6 +121,19 @@ test('a vague request asks which one, the pick applies it, and Undo puts the cou
   expect(led.querySelector('.row-count').textContent).toBe('12 bulbs');
 });
 
+test('a second pass of the script on emptied flood bulbs takes nothing and offers no Undo', async () => {
+  await mount();
+  for (let i = 0; i < 4; i++) await speak(); // "three lightbulbs"
+  await act(async () => button('Flood bulbs').click());
+  expect(host.querySelector('.reply-stock').textContent).toContain('0 bulbs');
+  expect(button('Undo')).toBeDefined();
+  for (let i = 0; i < 5; i++) await speak(); // round again to "three lightbulbs"
+  await act(async () => button('Flood bulbs').click());
+  expect(host.textContent).toContain('There are no flood bulbs');
+  expect(host.textContent).not.toContain('Took 3');
+  expect(button('Undo')).toBeUndefined();
+});
+
 test('Undo disappears after ten seconds', async () => {
   await mount();
   await act(async () => host.querySelector('button.mic').click());
