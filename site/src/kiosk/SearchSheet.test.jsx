@@ -222,3 +222,24 @@ test('an overflowing notice with no Undo is the last stop in both directions', a
   expect(await pressTab(host.querySelector('h1'), true)).toBe(true);
   expect(document.activeElement).toBe(notice);
 });
+
+// jsdom lays nothing out and loads no stylesheet, so the rectangles and the
+// stylesheet's scroll padding (--focus-gutter, 8px) are given by hand.
+test('a notice that covers the focused row scrolls it clear by the focus gutter', async () => {
+  await mount();
+  const content = host.querySelector('.sheet-content');
+  const control = button('Add one pair to Work gloves');
+  control.focus();
+  const styleOf = window.getComputedStyle;
+  const spy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    const style = styleOf(element, pseudo);
+    return element === content ? { ...style, scrollPaddingTop: '8px' } : style;
+  });
+  content.getBoundingClientRect = () => ({ top: 100, bottom: 400 });
+  control.getBoundingClientRect = () => ({ top: 350, bottom: 402 });
+  content.scrollTop = 0;
+  await mount({ notice: 'Updated Work gloves.', undoLeft: 10, onUndo: () => {} });
+  spy.mockRestore();
+  // 2px hidden, plus the 8px the outline needs.
+  expect(content.scrollTop).toBe(10);
+});
