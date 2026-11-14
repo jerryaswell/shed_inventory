@@ -74,7 +74,13 @@ export default function App({
   useEffect(() => {
     let live = true;
     (async () => {
-      const config = await loadConfigImpl();
+      let config;
+      try {
+        config = await loadConfigImpl();
+      } catch {
+        if (live) setStatus('unavailable');
+        return;
+      }
       if (!live) return;
       if (!config) {
         setStatus('sample');

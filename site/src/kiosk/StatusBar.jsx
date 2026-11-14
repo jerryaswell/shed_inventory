@@ -4,6 +4,7 @@
 const LABELS = {
   checking: 'Checking API…',
   sample: 'API not configured',
+  unavailable: 'API configuration unavailable',
   online: 'API connected',
   offline: 'API unavailable'
 };

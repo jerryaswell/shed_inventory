@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { loadConfig } from './config.js';
+import { ConfigUnavailableError, loadConfig } from './config.js';
 import { checkHealth } from './api.js';
 
 const reply = (status, body, type = 'application/json') => async () =>
@@ -11,15 +11,27 @@ test('a deployed config.json gives the API base', async () => {
   });
 });
 
-test('no config is sample mode: a 404, the dev server\'s index.html, a network error', async () => {
+test('no config is sample mode: a 404, the dev server\'s index.html', async () => {
   expect(await loadConfig(reply(404, 'not found', 'text/plain'))).toBeNull();
   expect(await loadConfig(reply(200, '<!doctype html>', 'text/html'))).toBeNull();
-  expect(await loadConfig(async () => { throw new TypeError('offline'); })).toBeNull();
 });
 
-test('a config with no usable apiBase is sample mode', async () => {
+test('a config that cannot be retrieved or read is unavailable, not absent', async () => {
+  const failures = [
+    async () => { throw new TypeError('offline'); },
+    reply(503, 'service unavailable', 'text/plain'),
+    reply(500, { error: 'boom' }),
+    reply(403, 'forbidden', 'text/html'),
+    reply(200, '{"apiBase": ', 'application/json')
+  ];
+  for (const fetchImpl of failures) {
+    await expect(loadConfig(fetchImpl)).rejects.toThrow(ConfigUnavailableError);
+  }
+});
+
+test('a config with no usable apiBase is unavailable', async () => {
   for (const body of [{}, { apiBase: '' }, { apiBase: 'http://insecure.example' }, { apiBase: 'https://x.example/path' }]) {
-    expect(await loadConfig(reply(200, body))).toBeNull();
+    await expect(loadConfig(reply(200, body))).rejects.toThrow(ConfigUnavailableError);
   }
 });
 
