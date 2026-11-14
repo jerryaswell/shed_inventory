@@ -9,7 +9,7 @@
  * for the backend's voice route is what makes it work.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Pause, Play, Search, Undo2 } from 'lucide-react';
+import { Pause, Play, Search } from 'lucide-react';
 import { loadConfig } from './core/config.js';
 import { checkHealth } from './core/api.js';
 import { applyChange, inverseOf } from './core/inventory.js';
@@ -20,15 +20,43 @@ import MicButton from './kiosk/MicButton.jsx';
 import Reply from './kiosk/Reply.jsx';
 import SearchSheet from './kiosk/SearchSheet.jsx';
 import Screensaver from './kiosk/Screensaver.jsx';
-import { useNow } from './kiosk/useNow.js';
+import UndoButton, { UNDO_MS } from './kiosk/UndoButton.jsx';
 import AmbientBackground from './kiosk/AmbientBackground.jsx';
 import { useAmbientMotion } from './kiosk/useAmbientMotion.js';
 import { useFocusRescue } from './kiosk/useFocusRescue.js';
 
-const UNDO_MS = 10_000;
 const IDLE_MS = 90_000;
 // Read in handlers only, never during render.
 const wallClock = () => Date.now();
+
+/**
+ * Calls `onDue` once `clock` has passed `at`, or never while `at` is null. One
+ * timeout, not a tick. A timer can run late, or not at all while the page is
+ * hidden, so the clock is read again when it fires and when the page is shown.
+ */
+function useDeadline(at, clock, onDue) {
+  const due = useRef(onDue);
+  useEffect(() => {
+    due.current = onDue;
+  });
+  useEffect(() => {
+    if (at == null) return;
+    let id;
+    const check = () => {
+      clearTimeout(id);
+      const left = at - clock();
+      if (left < 0) due.current();
+      else id = setTimeout(check, left + 1);
+    };
+    const onVisibility = () => document.hidden || check();
+    check();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [at, clock]);
+}
 
 export default function App({
   loadConfigImpl = loadConfig,
@@ -37,7 +65,6 @@ export default function App({
   thinkMs = 700,
   clock = wallClock
 }) {
-  const now = useNow(500, clock);
   const [status, setStatus] = useState('checking');
   const [items, setItems] = useState(sampleInventory);
   const [phase, setPhase] = useState('idle');
@@ -45,6 +72,7 @@ export default function App({
   const [undo, setUndo] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [lastTouch, setLastTouch] = useState(clock);
+  const [idle, setIdle] = useState(false);
 
   const itemsRef = useRef(items);
   const timer = useRef(null);
@@ -151,10 +179,18 @@ export default function App({
     setResult({ action: 'undone', heard: null, itemId: undo.change.itemId, reply: 'Last change undone.' });
   };
 
-  // The clock ticks every half second, so it can trail the moment Undo was set.
-  const undoLeft = undo ? Math.min(UNDO_MS / 1000, Math.max(0, Math.ceil((undo.until - now) / 1000))) : 0;
+  const touch = () => {
+    setLastTouch(clock());
+    setIdle(false);
+  };
+
+  // Nothing ticks here: Undo goes at its deadline, and the kiosk sleeps once a
+  // minute and a half has passed untouched and not busy. The clocks and the
+  // Undo countdown keep their own time, so they rerender only themselves.
+  useDeadline(undo?.until ?? null, clock, () => setUndo(null));
   const busy = phase === 'listening' || phase === 'thinking';
-  const sleeping = !busy && now - lastTouch > IDLE_MS;
+  useDeadline(busy || idle ? null : lastTouch + IDLE_MS, clock, () => setIdle(true));
+  const sleeping = !busy && idle;
   const motion = useAmbientMotion({ sleeping });
   const MotionIcon = motion.userPaused ? Play : Pause;
 
@@ -179,14 +215,14 @@ export default function App({
   return (
     <div
       className="kiosk"
-      onPointerDownCapture={() => setLastTouch(clock())}
+      onPointerDownCapture={touch}
       // Asleep, a key is the saver's to handle: it wakes on the key's release.
-      onKeyDownCapture={() => sleeping || setLastTouch(clock())}
+      onKeyDownCapture={() => sleeping || touch()}
       onFocus={onFocus}
     >
       <AmbientBackground paused={motion.paused} sleeping={sleeping} />
       <div ref={contentRef} className="kiosk-content" inert={sleeping}>
-        <StatusBar status={status} now={now} controls={
+        <StatusBar status={status} clock={clock} controls={
           <button
             type="button"
             className="motion-toggle"
@@ -218,13 +254,7 @@ export default function App({
       </div>
 
       <footer className="foot" inert={sleeping}>
-        {undoLeft > 0 && !sheetOpen && (
-          <button type="button" className="undo" onClick={onUndo}>
-            <Undo2 size={24} aria-hidden="true" />
-            Undo
-            <span className="undo-left" aria-hidden="true">{undoLeft}s</span>
-          </button>
-        )}
+        {undo && !sheetOpen && <UndoButton until={undo.until} clock={clock} onUndo={onUndo} />}
         <button type="button" className="search-btn" aria-haspopup="dialog" onClick={() => setSheetOpen(true)}>
           <Search size={24} aria-hidden="true" />
           Browse items
@@ -237,12 +267,13 @@ export default function App({
           onClose={() => setSheetOpen(false)}
           onChange={onManualChange}
           notice={result?.action === 'undone' ? 'Last change undone.' : result?.change ? result.reply : null}
-          undoLeft={undoLeft}
+          undoUntil={undo?.until ?? null}
+          clock={clock}
           onUndo={onUndo}
           suspended={sleeping}
         />
       )}
-      {sleeping && <Screensaver now={now} onWake={() => setLastTouch(clock())} buttonRef={saverRef} />}
+      {sleeping && <Screensaver clock={clock} onWake={touch} buttonRef={saverRef} />}
     </div>
   );
 }

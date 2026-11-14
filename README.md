@@ -45,7 +45,7 @@ site/                        the kiosk page; Vite builds it into dist/
       inventory.js           items, and changes as records that can be undone
       config.js              /config.json, which the deploy writes; none = sample mode
       api.js                 calls to the backend (the health check so far)
-    kiosk/                   the sample button, answer card, browse dialog,
+    kiosk/                   the sample button, answer card, browse dialog, Undo,
                                ambient background, screensaver, status line
     mock/
       sampleInventory.js     a made-up shed, and the mic's script

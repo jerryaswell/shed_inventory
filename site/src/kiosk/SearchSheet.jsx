@@ -8,12 +8,13 @@
  * search and the list are as they were when it opens again on waking.
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { X, Minus, Plus, Search, Undo2 } from 'lucide-react';
+import { X, Minus, Plus, Search } from 'lucide-react';
 import { byArea, describeStock, isLow, search } from '../core/inventory.js';
 import { useFocusRescue } from './useFocusRescue.js';
+import UndoButton from './UndoButton.jsx';
 import './SearchSheet.css';
 
-export default function SearchSheet({ items, onClose, onChange, notice, undoLeft = 0, onUndo, suspended = false }) {
+export default function SearchSheet({ items, onClose, onChange, notice, undoUntil = null, clock = Date.now, onUndo, suspended = false }) {
   const [query, setQuery] = useState('');
   const dialogRef = useRef(null);
   const contentRef = useRef(null);
@@ -23,7 +24,7 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
   const descriptionId = useId();
   const searchId = useId();
   const groups = byArea(search(items, query));
-  const hasUndo = undoLeft > 0;
+  const hasUndo = undoUntil != null;
   // When Undo is used or runs out while focused, focus returns to the title.
   const onFocus = useFocusRescue(titleRef);
 
@@ -157,16 +158,10 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
           ))}
         </div>
       </div>
-      {(notice || undoLeft > 0) && (
+      {(notice || hasUndo) && (
         <div className="sheet-feedback">
           {notice && <p role="status">{notice}</p>}
-          {undoLeft > 0 && (
-            <button type="button" className="undo" onClick={onUndo}>
-              <Undo2 size={26} aria-hidden="true" />
-              Undo
-              <span className="undo-left" aria-hidden="true">{undoLeft}s</span>
-            </button>
-          )}
+          {hasUndo && <UndoButton until={undoUntil} clock={clock} onUndo={onUndo} iconSize={26} />}
         </div>
       )}
     </dialog>
