@@ -274,7 +274,7 @@ export default function App({
           suspended={sleeping}
         />
       )}
-      {sleeping && <Screensaver clock={clock} onWake={touch} buttonRef={saverRef} />}
+      {sleeping && <Screensaver clock={clock} onWake={touch} buttonRef={saverRef} paused={motion.paused} />}
     </div>
   );
 }

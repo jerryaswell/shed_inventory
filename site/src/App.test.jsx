@@ -297,6 +297,7 @@ test('the lock screen keeps the same unpaused background after 90 seconds and a 
   await advance(2_000);
   expect(host.querySelector('.saver')).not.toBeNull();
   expect(host.querySelector('.kiosk').dataset.sleeping).toBe('true');
+  expect(host.querySelector('.saver').dataset.paused).toBe('false');
   expect(host.querySelectorAll('.ambient-background')).toHaveLength(1);
   expect(host.querySelector('.ambient-background')).toBe(background);
   expect(background.dataset.paused).toBe('false');
@@ -320,9 +321,11 @@ test.each(['manual pause', 'reduced motion', 'hidden page'])('the lock screen re
   expect(host.querySelector('.saver')).not.toBeNull();
   expect(host.querySelector('.ambient-background').dataset.paused).toBe('true');
   expect(localStorage.getItem('shed-ambient-motion-paused')).toBe(String(reason === 'manual pause'));
+  expect(host.querySelector('.saver').dataset.paused).toBe('true');
   if (hidden) {
     hidden.mockReturnValue(false);
     await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    expect(host.querySelector('.saver').dataset.paused).toBe('false');
   }
   await click('Wake the screen');
   expect(host.querySelector('.ambient-background').dataset.paused).toBe(String(reason !== 'hidden page'));

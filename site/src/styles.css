@@ -245,28 +245,62 @@ button svg { flex-shrink: 0; }
   visibility: hidden;
 }
 .saver {
+  --saver-width: 100vw;
+  --saver-height: 100vh;
+  --saver-left: max(24px, env(safe-area-inset-left));
+  --saver-right: max(24px, env(safe-area-inset-right));
+  --saver-top: max(24px, env(safe-area-inset-top));
+  --saver-bottom: max(24px, env(safe-area-inset-bottom));
   position: fixed;
   inset: 0;
   z-index: 20;
   border: none;
   background: transparent;
-  display: grid;
-  place-items: center;
 }
 .saver-clock {
+  /* Transform percentages subtract this group's own dimensions, so even a
+     changing clock or viewport stays inside the safe margins without JS. */
+  --travel-x: max(0px, calc(var(--saver-width) - 100% - var(--saver-left) - var(--saver-right)));
+  --travel-y: max(0px, calc(var(--saver-height) - 100% - var(--saver-top) - var(--saver-bottom)));
+  position: absolute;
+  left: var(--saver-left);
+  top: var(--saver-top);
+  width: max-content;
+  max-width: calc(100% - var(--saver-left) - var(--saver-right));
   display: flex;
   flex-direction: column;
   align-items: center;
   font-size: 56px;
   font-weight: 300;
   color: var(--text);
+  text-align: center;
   font-variant-numeric: tabular-nums;
-  transition: transform 2s;
+  transform: translate(calc(var(--travel-x) * 0.5), calc(var(--travel-y) * 0.5));
+  animation: saver-drift 240s ease-in-out infinite;
+  will-change: transform;
 }
 .saver-hint { font-size: 15px; color: var(--muted); margin-top: 6px; }
 
+@supports (height: 100dvh) {
+  .saver { --saver-width: 100dvw; --saver-height: 100dvh; }
+}
+
+@keyframes saver-drift {
+  0%, 100% { transform: translate(calc(var(--travel-x) * 0.5), calc(var(--travel-y) * 0.5)); }
+  20% { transform: translate(var(--travel-x), calc(var(--travel-y) * 0.08)); }
+  40% { transform: translate(calc(var(--travel-x) * 0.85), var(--travel-y)); }
+  60% { transform: translate(0px, calc(var(--travel-y) * 0.78)); }
+  80% { transform: translate(calc(var(--travel-x) * 0.15), 0px); }
+}
+
+.saver[data-paused='true'] .saver-clock {
+  animation-play-state: paused;
+  will-change: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .mic, .mic-thinking svg { animation: none; }
-  .mic, .saver-clock { transition: none; }
+  .mic, .mic-thinking svg, .saver-clock { animation: none; }
+  .mic { transition: none; }
+  .saver-clock { will-change: auto; }
   .mic:active { transform: none; }
 }

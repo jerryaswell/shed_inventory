@@ -28,10 +28,10 @@ Use **Try a sample** to run the scripted requests, or **Browse items** to search
 and adjust the sample inventory. Each change offers Undo for ten seconds. API
 connectivity is shown separately from the sample-data disclosure.
 
-**Pause motion** stops the decorative background and remembers the setting on
-that browser. The home and lock screens share the same slowly drifting and
-pulsing background. Device reduced-motion preferences also stop animation;
-hidden tabs pause it automatically.
+**Pause motion** stops the background and drifting lock-screen text, and
+remembers the setting on that browser. The home and lock screens share the same
+slowly drifting and pulsing background. Device reduced-motion preferences also
+stop animation; hidden tabs pause it automatically.
 
 ## Layout
 
@@ -131,7 +131,8 @@ features need its one-time Plus licence). It is set up entirely on the phone:
   battery** (stops charging at 85%), and set a weekly auto restart.
 
 After a minute and a half untouched, the controls hide behind a lock screen
-with the same ambient background and a clock that shifts each minute. The
+with the same ambient background. The time and “Tap anywhere” drift together
+across the screen on a slow four-minute path, inside safe margins. The
 background pulses gently over 34 to 58 seconds, independently of the slower
 drift. Pause motion and reduced-motion preferences apply on both screens. Check
 smoothness, heat, battery use and Android text scaling on the actual phone
