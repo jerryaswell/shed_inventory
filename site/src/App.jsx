@@ -9,7 +9,7 @@
  * for the backend's voice route is what makes it work.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Undo2 } from 'lucide-react';
 import { loadConfig } from './core/config.js';
 import { checkHealth } from './core/api.js';
 import { applyChange, inverseOf } from './core/inventory.js';
@@ -104,11 +104,6 @@ export default function App({
     timer.current = setTimeout(() => hear(heardNext.current), listenMs);
   };
 
-  const onTry = (sentence) => {
-    setResult(null);
-    hear(sentence);
-  };
-
   const onPick = (itemId) => {
     const item = itemsRef.current.find((i) => i.id === itemId);
     answer(resolve(item, result.pending.action, result.pending.quantity, result.heard));
@@ -128,7 +123,7 @@ export default function App({
     }
     setItems((cur) => applyChange(cur, undo.change));
     setUndo(null);
-    setResult({ action: 'undone', heard: null, reply: 'Undone. The count is back to what it was.' });
+    setResult({ action: 'undone', heard: null, itemId: undo.change.itemId, reply: 'Last change undone.' });
   };
 
   // The clock ticks every half second, so it can trail the moment Undo was set.
@@ -137,34 +132,37 @@ export default function App({
   const sleeping = !sheetOpen && !busy && now - lastTouch > IDLE_MS;
 
   return (
-    <div className="kiosk" onPointerDownCapture={() => setLastTouch(clock())}>
-      <StatusBar status={status} now={now} />
-      <p className="banner">Mockup: sample inventory, nothing is saved, and the mic plays a script.</p>
+    <div className="kiosk" onPointerDownCapture={() => setLastTouch(clock())} onKeyDownCapture={() => setLastTouch(clock())}>
+      <div className="kiosk-content">
+        <StatusBar status={status} now={now} />
+        <p className="banner">Sample inventory. Nothing is saved. No audio is recorded.</p>
 
-      <main className="stage">
-        <MicButton phase={phase} onTap={onMic} compact={result != null} />
-        {result ? (
-          <Reply result={result} items={items} undoLeft={sheetOpen ? 0 : undoLeft} onUndo={onUndo} onPick={onPick} />
-        ) : (
-          phase === 'idle' && (
-            <section className="try">
-              <p className="try-label">Try saying</p>
-              <div className="try-list">
-                {demoScript.map((s) => (
-                  <button type="button" key={s} className="chip" onClick={() => onTry(s)}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </section>
-          )
-        )}
-      </main>
+        <main className={`stage${result ? ' stage-result' : ''}`} aria-label="Inventory demo">
+          <MicButton phase={phase} onTap={onMic} compact={result != null} />
+          {result ? (
+            <Reply result={result} items={items} onPick={onPick} />
+          ) : (
+            phase === 'idle' && (
+              <section className="example" aria-label="Sample request">
+                <p className="example-label">First sample</p>
+                <p className="example-text">“{demoScript[0]}”</p>
+              </section>
+            )
+          )}
+        </main>
+      </div>
 
       <footer className="foot">
-        <button type="button" className="search-btn" onClick={() => setSheetOpen(true)}>
+        {undoLeft > 0 && !sheetOpen && (
+          <button type="button" className="undo" onClick={onUndo}>
+            <Undo2 size={24} aria-hidden="true" />
+            Undo
+            <span className="undo-left" aria-hidden="true">{undoLeft}s</span>
+          </button>
+        )}
+        <button type="button" className="search-btn" aria-haspopup="dialog" onClick={() => setSheetOpen(true)}>
           <Search size={24} aria-hidden="true" />
-          Search or browse
+          Browse items
         </button>
       </footer>
 

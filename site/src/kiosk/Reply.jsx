@@ -1,30 +1,51 @@
 /**
- * What the kiosk heard and what it answers: an item and where it is, a change
- * with its Undo, or a question back with the choices as buttons.
+ * Item facts come from the current inventory, including after Undo. The full
+ * assistant reply is retained for exceptions and disambiguation.
  */
-import { MapPin, Undo2, AlertTriangle } from 'lucide-react';
+import { MapPin, AlertTriangle } from 'lucide-react';
 import { describeStock, isLow } from '../core/inventory.js';
 
-export default function Reply({ result, items, undoLeft, onUndo, onPick }) {
+const SUMMARY = {
+  find: 'Found',
+  take: 'Taken',
+  return: 'Returned',
+  adjust: 'Updated',
+  undone: 'Change undone'
+};
+
+export default function Reply({ result, items, onPick }) {
   if (!result) return null;
   const item = result.itemId ? items.find((i) => i.id === result.itemId) : null;
+  const showMessage = !item || result.action === 'unknown';
   return (
-    <section className={`reply reply-${result.action}`} aria-live="polite">
-      {result.heard && <p className="reply-heard">“{result.heard}”</p>}
-      <p className="reply-text">{result.reply}</p>
+    <section className={`reply reply-${result.action}`} aria-live="polite" aria-atomic="true">
+      {showMessage && (
+        <>
+          {result.heard && <p className="reply-heard">Sample: “{result.heard}”</p>}
+          <p className="reply-text">{result.reply}</p>
+        </>
+      )}
 
       {item && (
-        <div className="reply-item">
-          <MapPin size={28} aria-hidden="true" />
-          <div>
-            <div className="reply-where">{item.location.area}</div>
-            <div className="reply-spot">{item.location.spot}</div>
+        <>
+          <div className="reply-heading">
+            {!showMessage && <p className="reply-summary">{SUMMARY[result.action]}</p>}
+            <h2 className="reply-name">{item.name}</h2>
           </div>
-          <div className={`reply-stock${isLow(item) ? ' low' : ''}`}>
-            {isLow(item) && <AlertTriangle size={18} aria-hidden="true" />}
-            {describeStock(item)}
+          <div className="reply-item">
+            <div className="reply-location">
+              <MapPin size={22} aria-hidden="true" />
+              <div>
+                <div className="reply-where">{item.location.area}</div>
+                <div className="reply-spot">{item.location.spot}</div>
+              </div>
+            </div>
+            <div className={`reply-stock${isLow(item) ? ' low' : ''}`}>
+              <span>{describeStock(item)}</span>
+              {isLow(item) && <span className="reply-low"><AlertTriangle size={18} aria-hidden="true" />Low stock</span>}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {result.options && (
@@ -35,14 +56,6 @@ export default function Reply({ result, items, undoLeft, onUndo, onPick }) {
             </button>
           ))}
         </div>
-      )}
-
-      {undoLeft > 0 && (
-        <button type="button" className="undo" onClick={onUndo}>
-          <Undo2 size={26} aria-hidden="true" />
-          Undo
-          <span className="undo-left">{undoLeft}s</span>
-        </button>
       )}
     </section>
   );
