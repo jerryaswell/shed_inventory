@@ -59,6 +59,7 @@ scripts/                     shared with the other spokes, with their tests:
   main-head-check.sh           apply only if this run is for main's head
   check-lockfiles.js           every lock entry has an integrity and a registry URL
   csp-compare.sh               the served CSP against the one Terraform built
+  gitignore.test.js            .env.local and .env.<mode>.local stay out of git
 modules/aws/
   amplify/                   the app and its headers (CSP, Permissions-Policy)
   dynamodb/                  the inventory table (point-in-time recovery, prevent_destroy)

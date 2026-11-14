@@ -46,3 +46,4 @@ modules/aws/lambda/placeholder.zip
 # Local env
 .env
 .env.local
+.env.*.local
