@@ -145,7 +145,9 @@ export default function App({
     <div
       className="kiosk"
       data-sleeping={sleeping}
-      onPointerDownCapture={touch}
+      // Keep the saver mounted through pointer-up and the compatibility click;
+      // waking on pointer-down would let that click activate a revealed control.
+      onPointerDownCapture={() => sleeping || touch()}
       // Asleep, a key is the saver's to handle: it wakes on the key's release.
       onKeyDownCapture={() => sleeping || touch()}
       onFocus={onFocus}

@@ -196,6 +196,31 @@ test('the lock screen keeps the background and a clock-free hint after 90 second
   expect(host.querySelector('.ambient-background')).toBe(background);
 });
 
+test.each([false, true])('a pointer gesture keeps the saver until its click and only wakes (Browse open: %s)', async (browseOpen) => {
+  await mount();
+  if (browseOpen) await click('Browse items');
+  const dialog = host.querySelector('dialog.sheet');
+  const motion = button('Pause motion', dialog ?? host);
+  motion.focus();
+  await advance(91_000);
+  const saver = host.querySelector('.saver');
+
+  for (const type of ['pointerdown', 'pointerup']) {
+    await act(async () => saver.dispatchEvent(new Event(type, { bubbles: true, cancelable: true })));
+    expect(host.querySelector('.saver')).toBe(saver);
+    expect(document.activeElement).toBe(saver);
+    expect(host.querySelector('.kiosk-content').hasAttribute('inert')).toBe(true);
+    if (dialog) expect(dialog.open).toBe(false);
+  }
+
+  await act(async () => saver.click());
+  expect(host.querySelector('.saver')).toBeNull();
+  expect(host.querySelector('dialog.sheet')).toBe(dialog);
+  if (dialog) expect(dialog.open).toBe(true);
+  expect(document.activeElement).toBe(motion);
+  expect(localStorage.getItem('shed-ambient-motion-paused')).toBe('false');
+});
+
 test.each(['manual pause', 'reduced motion', 'hidden page'])('the lock screen respects %s without replacing the saved preference', async (reason) => {
   let hidden;
   if (reason === 'manual pause') localStorage.setItem('shed-ambient-motion-paused', 'true');

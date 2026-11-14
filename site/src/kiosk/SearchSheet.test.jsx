@@ -139,10 +139,13 @@ test('search filters supplied inventory and distinguishes no matches from no ite
   expect(host.querySelectorAll('.row')).toHaveLength(testInventory.length);
 });
 
-test.each([null, testInventory])('Tab wraps between enabled controls for unavailable and loaded inventory', async (items) => {
+test.each([null, testInventory])('Tab contains controls and scrollable content for unavailable and loaded inventory', async (items) => {
   await mount({ items });
   const first = button('Home');
-  const last = host.querySelector('input') ?? button('Pause motion');
+  const content = host.querySelector('[role="region"]');
+  expect(content.getAttribute('aria-label')).toBe('Inventory content');
+  expect(content.tabIndex).toBe(0);
+  const last = host.querySelector('input') ?? content;
   last.focus();
   expect(await pressTab(last)).toBe(true);
   expect(document.activeElement).toBe(first);
@@ -159,14 +162,18 @@ test.each([null, testInventory])('Tab wraps between enabled controls for unavail
   }
 });
 
-test('reduced motion leaves Home as a usable wrapped keyboard destination', async () => {
+test('reduced motion keeps Home and scrollable content in the keyboard loop', async () => {
   await mount({ motion: { ...motion, reducedMotion: true } });
   const home = button('Home');
+  const content = host.querySelector('.sheet-content');
   home.focus();
-  expect(await pressTab(home)).toBe(true);
+  // Native Tab can reach the scroll region instead of being trapped on Home.
+  expect(await pressTab(home)).toBe(false);
+  content.focus();
+  expect(await pressTab(content)).toBe(true);
   expect(document.activeElement).toBe(home);
   expect(await pressTab(home, true)).toBe(true);
-  expect(document.activeElement).toBe(home);
+  expect(document.activeElement).toBe(content);
 });
 
 test('suspending Browse preserves its query, scrolling and focus without reopening on other updates', async () => {

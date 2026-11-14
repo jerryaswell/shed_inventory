@@ -70,7 +70,7 @@ export default function SearchSheet({ items = null, onClose, onHome, suspended =
       onFocus={onFocus}
       onKeyDown={(event) => {
         if (event.key !== 'Tab') return;
-        const stops = [...event.currentTarget.querySelectorAll('button:enabled, input:enabled')];
+        const stops = [...event.currentTarget.querySelectorAll('button:enabled, input:enabled, [tabindex="0"]')];
         const active = document.activeElement;
         const at = stops.indexOf(active);
         if (event.shiftKey && (at === 0 || active === titleRef.current)) {
@@ -89,7 +89,7 @@ export default function SearchSheet({ items = null, onClose, onHome, suspended =
           onHome();
         }}
       />
-      <div ref={contentRef} className="sheet-content">
+      <div ref={contentRef} className="sheet-content" role="region" aria-label="Inventory content" tabIndex={0}>
         <div className="sheet-head">
           <h1 id={titleId} ref={titleRef} tabIndex={-1} className="sheet-title">Browse items</h1>
           {items?.length > 0 && (
