@@ -1,0 +1,154 @@
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { act, StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import SearchSheet from './SearchSheet.jsx';
+import { sampleInventory } from '../mock/sampleInventory.js';
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+let host;
+let root;
+let opener;
+let showModal;
+let close;
+const dialogMethods = Object.getOwnPropertyDescriptors(HTMLDialogElement.prototype);
+
+beforeEach(() => {
+  // jsdom does not implement the native dialog API or browser focus containment.
+  showModal = vi.fn(function () { this.open = true; });
+  close = vi.fn(function () { this.open = false; });
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: { configurable: true, value: showModal },
+    close: { configurable: true, value: close }
+  });
+  opener = document.createElement('button');
+  opener.type = 'button';
+  opener.textContent = 'Browse items';
+  host = document.createElement('div');
+  document.body.append(opener, host);
+  opener.focus();
+  root = createRoot(host);
+});
+
+afterEach(() => {
+  act(() => root.unmount());
+  host.remove();
+  opener.remove();
+  for (const name of ['showModal', 'close']) {
+    if (dialogMethods[name]) Object.defineProperty(HTMLDialogElement.prototype, name, dialogMethods[name]);
+    else delete HTMLDialogElement.prototype[name];
+  }
+});
+
+async function mount(props = {}, strict = false) {
+  const sheet = <SearchSheet items={sampleInventory} onClose={() => root.render(null)} onChange={() => {}} {...props} />;
+  await act(async () => root.render(strict ? <StrictMode>{sheet}</StrictMode> : sheet));
+}
+
+const button = (label) => [...host.querySelectorAll('button')].find((element) => element.getAttribute('aria-label') === label || element.textContent === label);
+const rowFor = (name) => [...host.querySelectorAll('.row')].find((row) => row.querySelector('.row-name').textContent === name);
+
+test.each([false, true])('opens a named modal, focuses labelled search, and restores its opener (Strict Mode: %s)', async (strict) => {
+  await mount({}, strict);
+  const dialog = host.querySelector('dialog');
+  const input = host.querySelector('input');
+  expect(dialog.open).toBe(true);
+  expect(showModal).toHaveBeenCalled();
+  expect(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent).toBe('Browse items');
+  expect(input.labels[0].textContent).toBe('Search items');
+  expect(document.activeElement).toBe(input);
+
+  await act(async () => button('Close search').click());
+  expect(host.querySelector('dialog')).toBeNull();
+  expect(close).toHaveBeenCalled();
+  expect(document.activeElement).toBe(opener);
+});
+
+test('native Escape cancellation closes through the parent and restores focus', async () => {
+  await mount();
+  const cancel = new Event('cancel', { cancelable: true });
+  await act(async () => host.querySelector('dialog').dispatchEvent(cancel));
+  expect(cancel.defaultPrevented).toBe(true);
+  expect(host.querySelector('dialog')).toBeNull();
+  expect(document.activeElement).toBe(opener);
+});
+
+test('Tab wraps between the first and last enabled controls', async () => {
+  await mount();
+  const first = button('Close search');
+  const last = button('Add one pair to Work gloves');
+  last.focus();
+  const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+  await act(async () => last.dispatchEvent(tab));
+  expect(tab.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(first);
+  const reverseTab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+  await act(async () => first.dispatchEvent(reverseTab));
+  expect(reverseTab.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(last);
+});
+
+test('shows units and announces the unit changed by each stock control', async () => {
+  const onChange = vi.fn();
+  await mount({ onChange });
+  expect(rowFor('Deck screws (3")').querySelector('.row-count').textContent).toBe('1 box');
+  expect(rowFor('Work gloves').querySelector('.row-count').textContent).toBe('3 pairs');
+  await act(async () => button('Add one box to Deck screws (3")').click());
+  await act(async () => button('Remove one pair from Work gloves').click());
+  expect(onChange.mock.calls).toEqual([
+    [{ itemId: 'screws-deck', delta: 1 }],
+    [{ itemId: 'gloves-work', delta: -1 }]
+  ]);
+});
+
+test('zero stock disables removal while preserving addition and tool toggles', async () => {
+  const onChange = vi.fn();
+  const items = sampleInventory.map((item) => item.id === 'screws-deck' ? { ...item, quantity: 0 } : item);
+  await mount({ items, onChange });
+  const remove = button('Remove one box from Deck screws (3")');
+  expect(remove.disabled).toBe(true);
+  expect(rowFor('Deck screws (3")').querySelector('.row-count').textContent).toBe('0 boxes');
+  await act(async () => remove.click());
+  expect(onChange).not.toHaveBeenCalled();
+  expect(button('Add one box to Deck screws (3")').disabled).toBe(false);
+
+  await act(async () => button('Cordless drill is in the shed; tap to change').click());
+  expect(onChange).toHaveBeenLastCalledWith({ itemId: 'drill-cordless', out: true });
+  await mount({ items: items.map((item) => item.id === 'drill-cordless' ? { ...item, out: true } : item), onChange });
+  expect(rowFor('Cordless drill').querySelector('.tool-state').textContent).toBe('Out');
+  await act(async () => button('Cordless drill is out of the shed; tap to change').click());
+  expect(onChange).toHaveBeenLastCalledWith({ itemId: 'drill-cordless', out: false });
+});
+
+test('search filters the rows and reports a query with no matches', async () => {
+  await mount();
+  const input = host.querySelector('input');
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  const searchFor = async (query) => act(async () => {
+    setValue.call(input, query);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await searchFor('pegboard');
+  expect([...host.querySelectorAll('.row-name')].map((element) => element.textContent)).toEqual(['Duct tape', 'Cordless drill']);
+  await searchFor('missing item');
+  expect(host.querySelectorAll('.row')).toHaveLength(0);
+  expect(host.querySelector('.sheet-empty').textContent).toBe('Nothing matches “missing item”.');
+});
+
+test('feedback renders one Undo and follows remaining time without reopening or moving focus', async () => {
+  const onUndo = vi.fn();
+  await mount({ notice: 'Updated Work gloves.', undoLeft: 10, onUndo });
+  const add = button('Add one pair to Work gloves');
+  add.focus();
+  await mount({ notice: 'Updated Work gloves.', undoLeft: 6, onUndo });
+  expect(host.querySelectorAll('.undo')).toHaveLength(1);
+  expect(host.querySelector('.undo').textContent).toBe('Undo6s');
+  expect(host.querySelector('[role="status"]').textContent).toBe('Updated Work gloves.');
+  expect(showModal).toHaveBeenCalledTimes(1);
+  expect(document.activeElement).toBe(add);
+  await act(async () => host.querySelector('.undo').click());
+  expect(onUndo).toHaveBeenCalledTimes(1);
+  await mount({ notice: 'Last change undone.', undoLeft: 0, onUndo });
+  expect(host.querySelector('.undo')).toBeNull();
+  expect(host.querySelector('[role="status"]').textContent).toBe('Last change undone.');
+});

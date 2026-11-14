@@ -34,7 +34,8 @@ export function inverseOf(change, before) {
 /** "12 bulbs", "1 box", or "in the shed" / "out" for a tool. */
 export function describeStock(item) {
   if (item.kind === 'tool') return item.out ? 'out of the shed' : 'in the shed';
-  const unit = item.quantity === 1 ? item.unit : `${item.unit}s`;
+  const plural = item.unit === 'box' ? 'boxes' : `${item.unit}s`;
+  const unit = item.quantity === 1 ? item.unit : plural;
   return `${item.quantity} ${unit}`;
 }
 

@@ -67,3 +67,15 @@ test('describeStock and isLow', () => {
   expect(isLow({ kind: 'stock', quantity: 3, lowAt: 2 })).toBe(false);
   expect(isLow({ kind: 'stock', quantity: 0 })).toBe(false);
 });
+
+test.each([
+  [0, 'box', '0 boxes'],
+  [1, 'box', '1 box'],
+  [2, 'box', '2 boxes'],
+  [1, 'pair', '1 pair'],
+  [3, 'pair', '3 pairs'],
+  [2, 'bottle', '2 bottles'],
+  [4, 'roll', '4 rolls']
+])('describeStock includes the unit for %i %s', (quantity, unit, expected) => {
+  expect(describeStock({ kind: 'stock', quantity, unit })).toBe(expected);
+});
