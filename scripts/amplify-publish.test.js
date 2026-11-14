@@ -220,3 +220,21 @@ test('amplify-publish: an upload answered 403 is not retried', async (t) => {
     ['aws amplify create-deployment']
   );
 });
+
+test('deploy.yml: the publish goes to the amplify_branch_name output, not a literal branch (#24)', () => {
+  // The hosting branch is an input; a literal here would publish to the old
+  // branch, or to none, once the input changed. Read as text, comments left out.
+  const workflow = fileURLToPath(new URL('../.github/workflows/deploy.yml', import.meta.url));
+  const lines = readFileSync(workflow, 'utf8')
+    .split('\n')
+    .filter((l) => !/^\s*#/.test(l));
+  const calls = lines.filter((l) => l.includes('./scripts/amplify-publish.sh'));
+  assert.equal(calls.length, 1, 'deploy.yml should call amplify-publish.sh once');
+  const m = /amplify-publish\.sh\s+"\$(\w+)"\s+"\$(\w+)"\s+\S+/.exec(calls[0]);
+  assert.ok(m, `the publish passes something other than two variables: ${calls[0].trim()}`);
+  const branchVar = m[2];
+  assert.ok(
+    lines.some((l) => new RegExp(`^\\s*${branchVar}=\\$\\(terraform output -raw amplify_branch_name\\)\\s*$`).test(l)),
+    `${branchVar} is not read from terraform output amplify_branch_name`
+  );
+});

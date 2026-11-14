@@ -3,6 +3,11 @@ output "app_id" {
   value       = aws_amplify_app.this.id
 }
 
+output "branch_name" {
+  description = "The production branch the site is published to."
+  value       = aws_amplify_branch.this.branch_name
+}
+
 output "branch_url" {
   description = "The production branch's amplifyapp.com URL."
   value       = "https://${aws_amplify_branch.this.branch_name}.${aws_amplify_app.this.default_domain}"
