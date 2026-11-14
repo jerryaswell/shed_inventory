@@ -117,7 +117,6 @@ test('main-head-check: a usage error exits 2', (t) => {
   assert.equal(check(head, dir, 'extra').status, 2);
 });
 
-/** The apply job's lines in deploy.yml, from `  apply:` to the next job. */
 /** The lines of one top-level job in deploy.yml. */
 function job(name) {
   const lines = readFileSync(WORKFLOW, 'utf8').split('\n');

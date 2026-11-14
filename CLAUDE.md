@@ -182,13 +182,20 @@ API, then set to `terraform output -raw api_url`.
 
 `gha-shed_inventory`, `-plan` and `-preview` are defined in
 `jerryaswell/terraform_infrastructure`, from this repository's entry in
-`repos` in its `terraform.tfvars`. As a new app repository, its first apply
-runs on AdministratorAccess (`administrator_access` on that entry), because
-its permissions reach its Amplify app by id and the app does not exist until
-that apply creates it. A change there then records the app id and replaces
-admin with a policy of this repository's own: its Amplify app, as the static
-spokes have, plus the table, the function and its role, and the HTTP API. It
-has no web ACL.
+`repos` in its `terraform.tfvars`, which records the Amplify app id and the
+HTTP API id. The write role holds one scoped inline policy,
+`gha-shed_inventory-deploy` (the `shed_inventory` entry of `scoped_policies`
+in its `aws_iam.tf`), and no `-shared` managed policy: its state, its Amplify
+app, as the static spokes have, plus the table, the function, the HTTP API and
+their log groups. The function's execution role is read-only to CI. It has no
+web ACL. This describes the hub's source; ask the simulator for the live
+decision.
+
+How it got there, for history: as a new app repository, its first apply ran on
+AdministratorAccess (`administrator_access` on that entry), because its
+permissions reach its Amplify app by id and the app did not exist until that
+apply created it. A later change there recorded the ids and replaced admin
+with the scoped policy. README.md's first-time setup keeps that procedure.
 
 State is `s3://jerryaswell-terraform-state/shed_inventory/terraform.tfstate`.
 

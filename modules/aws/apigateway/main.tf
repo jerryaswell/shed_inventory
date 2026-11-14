@@ -72,7 +72,9 @@ resource "aws_apigatewayv2_stage" "this" {
     })
   }
 
-  # The rate guard in front of the function, with its concurrency cap behind.
+  # The rate guard in front of the function. Behind it, the function has a
+  # reserved concurrency cap only when backend_reserved_concurrency is positive;
+  # at -1 it draws on the account's shared pool.
   default_route_settings {
     throttling_rate_limit  = 5
     throttling_burst_limit = 10
