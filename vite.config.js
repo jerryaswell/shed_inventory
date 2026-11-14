@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 /**
  * The site lives in site/ and builds to dist/, which the deploy publishes to
  * Amplify with a config.json written beside it. `npm run dev` serves no
- * config.json, so the page runs on its sample inventory (site/src/core/config.js).
+ * config.json, so the connection status is unconfigured (site/src/core/config.js).
  */
 export default defineConfig({
   root: 'site',

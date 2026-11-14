@@ -11,7 +11,7 @@ test('a deployed config.json gives the API base', async () => {
   });
 });
 
-test('no config is sample mode: a 404, the dev server\'s index.html', async () => {
+test('missing configuration returns null: a 404, the dev server\'s index.html', async () => {
   expect(await loadConfig(reply(404, 'not found', 'text/plain'))).toBeNull();
   expect(await loadConfig(reply(200, '<!doctype html>', 'text/html'))).toBeNull();
 });

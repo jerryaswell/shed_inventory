@@ -2,9 +2,9 @@ import { useLayoutEffect, useRef } from 'react';
 
 /**
  * Keep keyboard and screen-reader focus from falling to <body> when the
- * focused control goes away: Undo when it is used or runs out, a "which one"
- * choice once picked, the mic button while it is busy. Spread the returned
- * handler as `onFocus` on the region to watch (React's onFocus bubbles). After
+ * focused control goes away or becomes disabled, such as the motion toggle
+ * when the device preference changes. Spread the returned handler as `onFocus`
+ * on the region to watch (React's onFocus bubbles). After
  * every render, if the last focused control in that region is gone or disabled
  * and nothing else has focus, focus moves to `fallbackRef`.
  *
@@ -13,7 +13,7 @@ import { useLayoutEffect, useRef } from 'react';
  *
  * The fallback is focused without the browser's own scroll, which would also
  * scroll the page or a modal's backdrop. Pass `scrollerRef`, the fallback's
- * nearest scroll container, to bring it into view there instead: an answer
+ * nearest scroll container, to bring it into view there instead: a title
  * below the fold of a small screen is otherwise focused out of sight.
  */
 export function useFocusRescue(fallbackRef, { ignore, scrollerRef } = {}) {

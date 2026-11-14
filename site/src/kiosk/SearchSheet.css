@@ -1,7 +1,4 @@
-/*
- * The browse dialog: a full-height native <dialog> on the same tokens as the
- * kiosk (styles.css), with its own scrolling list and a pinned feedback bar.
- */
+/* The modal keeps navigation and connection status outside its scrolling list. */
 .sheet {
   position: fixed;
   inset: 0;
@@ -25,25 +22,21 @@
 .sheet[open] { display: flex; }
 .sheet::backdrop { background: #080b12e6; }
 
-.sheet-disclosure { flex-shrink: 0; margin: 0; color: var(--muted); font-size: 0.8rem; }
-
 .sheet-content {
   flex: 1;
   min-height: 0;
   min-width: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  /* The focus gutter (styles.css), taken out of the sheet's own padding at the
-     sides so the list keeps its width. */
+  /* Reserve the focus outline inside this clipped scroll container. */
   padding: var(--focus-gutter);
   margin: 0 calc(4px - var(--focus-gutter));
   scroll-padding: var(--focus-gutter);
   scrollbar-color: var(--line) var(--panel);
 }
 
-.sheet-head { display: flex; flex-direction: column; flex-shrink: 0; gap: 12px; }
-.sheet-title-row { display: flex; align-items: center; gap: 12px; }
-.sheet-title { flex: 1; min-width: 0; margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+.sheet-head { display: flex; flex-direction: column; gap: 16px; }
+.sheet-title { min-width: 0; margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
 .sheet-title:focus { outline: none; }
 .sheet-title:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 
@@ -76,7 +69,7 @@
 }
 .sheet-search input::placeholder { color: var(--muted); opacity: 1; }
 
-.sheet-list { margin-top: 16px; }
+.sheet-list { margin-top: 24px; }
 .sheet-area {
   margin: 16px 0 0;
   color: var(--muted);
@@ -88,62 +81,21 @@
 }
 .sheet-list section:first-child .sheet-area { margin-top: 0; }
 .sheet-empty { margin: 20px 0; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
+.sheet-unavailable { margin: clamp(32px, 10vh, 96px) auto 24px; max-width: 30ch; text-align: center; overflow-wrap: anywhere; }
+.sheet-unavailable h2 { margin: 0 0 12px; font-size: 1.15rem; font-weight: 500; }
+.sheet-unavailable p { margin: 0; color: var(--muted); line-height: 1.6; }
 
 .row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
   padding: 16px 0;
   border-bottom: 1px solid var(--line);
 }
-.row-text { min-width: 0; overflow-wrap: anywhere; }
+.row-text { flex: 1 1 15ch; min-width: 0; overflow-wrap: anywhere; }
 .row-name { font-weight: 600; }
 .row-spot { color: var(--muted); font-size: 0.9rem; }
-.row-qty { display: grid; grid-template-columns: 52px minmax(0, 1fr) 52px; align-items: center; gap: 12px; }
-.row-count {
-  min-width: 0;
-  text-align: center;
-  font-size: 1.15rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-.row-count.low { color: var(--warn); }
-
-.icon-btn {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  min-height: 52px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel-2);
-}
-.tool-state {
-  justify-self: start;
-  min-width: 88px;
-  min-height: 52px;
-  padding: 10px 16px;
-  border: 1px solid var(--ok);
-  border-radius: 12px;
-  background: transparent;
-  color: var(--ok);
-  font-weight: 700;
-}
-.tool-state.out { border-color: var(--warn); color: var(--warn); }
-
-.sheet-feedback {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  max-height: 45%;
-  min-width: 0;
-  padding: 12px 4px 4px;
-  border-top: 1px solid var(--line);
-  overflow-wrap: anywhere;
-}
-.sheet-feedback p { min-height: 0; overflow-y: auto; margin: 0 0 10px; }
-.sheet-feedback p:last-child { margin-bottom: 0; }
-.sheet-feedback .undo { flex-shrink: 0; width: 100%; min-height: 52px; flex-wrap: wrap; }
+.row-stock { min-width: 0; color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.row-stock.low { color: var(--warn); }

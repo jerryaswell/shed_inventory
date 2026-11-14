@@ -153,16 +153,18 @@ the root, in the same layout as `jerryaswell/self_mgmt`.
 
 ### Where it stands
 
-The infrastructure is real and the interface is a mockup. The kiosk page runs
-on a sample inventory held in memory (`site/src/mock/`): the mic records
-nothing, and each tap "hears" the next line of a script. The API has one route,
-`GET /health`, which takes no credentials and reads nothing. Do not add a route
-that reads or writes the table without an authorizer in front of it.
+The infrastructure and kiosk shell are ready for the live backend. Voice is
+unavailable, and Browse shows unavailable inventory until data routes are
+connected. There is no runtime sample inventory, simulated voice or local-only
+stock mutation. The API has one route, `GET /health`, which takes no credentials
+and reads nothing. A successful health check does not enable data or voice
+features. Do not add a route that reads or writes the table without an
+authorizer in front of it.
 
 `site/src/core/inventory.js` is the model the kiosk and the backend share: an
 item, and a change as a record (`{ itemId, delta }` or `{ itemId, out }`),
-never an overwrite, so every change can be undone. `site/src/mock/assistant.js`
-answers in the shape the voice route will.
+never an overwrite, so every change can be undone. Synthetic inventory lives
+under `site/src/test/fixtures/` and is imported only by tests.
 
 ### Node: the toolchain and the Lambda runtime are separate
 

@@ -5,14 +5,14 @@
  *
  * Nothing serves one locally: the dev server answers /config.json with
  * index.html (its SPA fallback), and a missing file is a 404. Both mean
- * "nothing deployed here": loadConfig gives null, and the page runs on its
- * sample inventory.
+ * "nothing deployed here": loadConfig gives null, and the status bar reports
+ * that the API is not configured.
  *
  * Anything else that fails to give a usable apiBase (a request that does not
  * complete, another error status, malformed JSON, an apiBase that is not an
  * https origin) is a deployment whose config could not be read, not one with
- * none: loadConfig throws, so the status can say so. The page still runs on
- * its sample inventory.
+ * none: loadConfig throws, so the status can say so. Inventory and voice remain
+ * unavailable until their authenticated routes are connected.
  */
 export class ConfigUnavailableError extends Error {
   constructor(reason) {

@@ -1,75 +1,75 @@
 import { describe, expect, test } from 'vitest';
 import { applyChange, byArea, describeStock, inverseOf, isLow, search } from './inventory.js';
-import { sampleInventory } from '../mock/sampleInventory.js';
+import { testInventory } from '../test/fixtures/inventory.js';
 
 const find = (items, id) => items.find((i) => i.id === id);
 
 describe('applyChange and inverseOf', () => {
   test('a count goes down, and its inverse puts it back', () => {
-    const before = find(sampleInventory, 'bulb-led-a19');
+    const before = find(testInventory, 'bulb-led-a19');
     const change = { itemId: before.id, delta: -3 };
-    const after = applyChange(sampleInventory, change);
+    const after = applyChange(testInventory, change);
     expect(find(after, before.id).quantity).toBe(before.quantity - 3);
     const undone = applyChange(after, inverseOf(change, before));
     expect(find(undone, before.id).quantity).toBe(before.quantity);
   });
 
   test('a count never goes below zero, and undoing it restores the real count', () => {
-    const before = find(sampleInventory, 'bulb-par38'); // 3
+    const before = find(testInventory, 'bulb-par38'); // 3
     const change = { itemId: before.id, delta: -5 };
-    const after = applyChange(sampleInventory, change);
+    const after = applyChange(testInventory, change);
     expect(find(after, before.id).quantity).toBe(0);
     expect(find(applyChange(after, inverseOf(change, before)), before.id).quantity).toBe(3);
   });
 
   test('a tool goes out and comes back', () => {
-    const before = find(sampleInventory, 'drill-cordless');
+    const before = find(testInventory, 'drill-cordless');
     const change = { itemId: before.id, out: true };
-    const after = applyChange(sampleInventory, change);
+    const after = applyChange(testInventory, change);
     expect(find(after, before.id).out).toBe(true);
     expect(find(applyChange(after, inverseOf(change, before)), before.id).out).toBe(false);
   });
 
   test('other items are the same objects', () => {
-    const after = applyChange(sampleInventory, { itemId: 'glue-wood', delta: 1 });
-    expect(find(after, 'tape-duct')).toBe(find(sampleInventory, 'tape-duct'));
+    const after = applyChange(testInventory, { itemId: 'glue-wood', delta: 1 });
+    expect(find(after, 'tape-duct')).toBe(find(testInventory, 'tape-duct'));
   });
 });
 
 describe('search', () => {
   test('matches names, aliases and plurals', () => {
-    expect(search(sampleInventory, 'lightbulbs').map((i) => i.id)).toEqual(['bulb-led-a19', 'bulb-par38']);
-    expect(search(sampleInventory, 'drill').map((i) => i.id)).toEqual(['drill-cordless']);
+    expect(search(testInventory, 'lightbulbs').map((i) => i.id)).toEqual(['bulb-led-a19', 'bulb-par38']);
+    expect(search(testInventory, 'drill').map((i) => i.id)).toEqual(['drill-cordless']);
   });
 
   test('every word must match', () => {
-    expect(search(sampleInventory, 'flood bulb').map((i) => i.id)).toEqual(['bulb-par38']);
+    expect(search(testInventory, 'flood bulb').map((i) => i.id)).toEqual(['bulb-par38']);
   });
 
   test('matches a location', () => {
-    expect(search(sampleInventory, 'pegboard').length).toBe(2);
+    expect(search(testInventory, 'pegboard').length).toBe(2);
   });
 
   test('a word that is only a suffix still has to match', () => {
     // "s" and "es" once stemmed to "", which every word starts with.
-    expect(search(sampleInventory, 's').map((i) => i.id)).not.toContain('tape-duct');
-    expect(search(sampleInventory, 's').length).toBe(sampleInventory.length - 1);
-    expect(search(sampleInventory, 'es')).toEqual([]);
+    expect(search(testInventory, 's').map((i) => i.id)).not.toContain('tape-duct');
+    expect(search(testInventory, 's').length).toBe(testInventory.length - 1);
+    expect(search(testInventory, 'es')).toEqual([]);
   });
 
   test('a short word in a longer query is not dropped', () => {
-    expect(search(sampleInventory, 'es drill')).toEqual([]);
-    expect(search(sampleInventory, 'zz drill')).toEqual([]);
-    expect(search(sampleInventory, 's drill').map((i) => i.id)).toEqual(['drill-cordless']);
+    expect(search(testInventory, 'es drill')).toEqual([]);
+    expect(search(testInventory, 'zz drill')).toEqual([]);
+    expect(search(testInventory, 's drill').map((i) => i.id)).toEqual(['drill-cordless']);
   });
 
   test('an empty query is everything', () => {
-    expect(search(sampleInventory, '  ')).toBe(sampleInventory);
+    expect(search(testInventory, '  ')).toBe(testInventory);
   });
 });
 
 test('byArea keeps the order areas first appear in', () => {
-  expect(byArea(sampleInventory).map((g) => g.area)).toEqual(['Shelf 2', 'Shelf 3', 'Pegboard', 'Floor', 'Back wall', 'Shelf 1']);
+  expect(byArea(testInventory).map((g) => g.area)).toEqual(['Shelf 2', 'Shelf 3', 'Pegboard', 'Floor', 'Back wall', 'Shelf 1']);
 });
 
 test('describeStock and isLow', () => {
