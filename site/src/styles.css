@@ -89,7 +89,8 @@ button svg { flex-shrink: 0; }
 .status-conn { display: flex; align-items: center; gap: 8px; }
 .status-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
 .status-online .status-dot { background: var(--ok); }
-.status-offline .status-dot { background: var(--warn); }
+.status-offline .status-dot,
+.status-unavailable .status-dot { background: var(--warn); }
 
 .banner {
   flex-shrink: 0;

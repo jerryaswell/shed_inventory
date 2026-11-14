@@ -55,6 +55,16 @@ test('with no config.json it identifies the demo, sample inventory, and absent A
   expect(host.textContent).toContain('Demo');
 });
 
+test('a config that could not be retrieved says so, and keeps the demo on its sample inventory', async () => {
+  const checkHealthImpl = vi.fn();
+  await mount({ loadConfigImpl: async () => { throw new Error('config.json unavailable: HTTP 503'); }, checkHealthImpl });
+  expect(host.textContent).toContain('API configuration unavailable');
+  expect(host.textContent).not.toContain('API not configured');
+  expect(host.textContent).toContain('Sample inventory. Nothing is saved. No audio is recorded.');
+  expect(button('Try a sample')).toBeDefined();
+  expect(checkHealthImpl).not.toHaveBeenCalled();
+});
+
 test.each([[true, 'API connected'], [false, 'API unavailable']])('a deployed API health result of %s shows %s without hiding the sample disclosure', async (healthy, status) => {
   await mount({ loadConfigImpl: async () => ({ apiBase: 'https://api' }), checkHealthImpl: async () => healthy });
   expect(host.textContent).toContain(status);
