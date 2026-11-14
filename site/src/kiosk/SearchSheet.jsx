@@ -57,15 +57,20 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
       onFocus={onFocus}
       onKeyDown={(event) => {
         if (event.key !== 'Tab') return;
-        const controls = [...event.currentTarget.querySelectorAll('button:enabled, input:enabled')];
-        const at = controls.indexOf(document.activeElement);
-        // From the title (not a control) Shift+Tab would leave the page.
-        if (event.shiftKey && at <= 0) {
+        // Every Tab stop, in order. A notice too long for its box scrolls, and
+        // the browser makes that scroller a Tab stop of its own.
+        const stops = [...event.currentTarget.querySelectorAll('button:enabled, input:enabled, .sheet-feedback p')]
+          .filter((stop) => stop.localName !== 'p' || stop.scrollHeight > stop.clientHeight);
+        const active = document.activeElement;
+        const at = stops.indexOf(active);
+        // From the title (not a stop) Shift+Tab would leave the page. Anything
+        // else that is not in the list is left to the browser.
+        if (event.shiftKey && (at === 0 || active === titleRef.current)) {
           event.preventDefault();
-          controls.at(-1).focus();
-        } else if (!event.shiftKey && at === controls.length - 1) {
+          stops.at(-1).focus();
+        } else if (!event.shiftKey && at === stops.length - 1) {
           event.preventDefault();
-          controls[0].focus();
+          stops[0].focus();
         }
       }}
     >
