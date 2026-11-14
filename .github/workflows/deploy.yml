@@ -384,6 +384,10 @@ jobs:
       - run: terraform init -input=false
       - run: terraform fmt -check -recursive
       - run: terraform validate
+      # The mocked tests in tests/: the input validation a plan of the
+      # committed values cannot exercise, such as a reservation of 0 that
+      # would disable the API (#22). Mock providers, so no AWS call.
+      - run: terraform test
 
       # Not failed yet: the output goes to the job summary first.
       - name: Terraform plan

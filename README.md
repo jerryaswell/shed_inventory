@@ -60,6 +60,7 @@ scripts/                     shared with the other spokes, with their tests:
   check-lockfiles.js           every lock entry has an integrity and a registry URL
   csp-compare.sh               the served CSP against the one Terraform built
   gitignore.test.js            .env.local and .env.<mode>.local stay out of git
+  terraform-test.test.js       the plan job runs the mocked Terraform tests
 modules/aws/
   amplify/                   the app and its headers (CSP, Permissions-Policy)
   dynamodb/                  the inventory table (point-in-time recovery, prevent_destroy)
@@ -73,6 +74,7 @@ terraform.tfvars             the inputs' values, none secret
 data.tf                      origins and tags
 aws_*.tf                     one module call each
 outputs.tf                   what CI and a person read back
+tests/                       mocked `terraform test` runs: the inputs' validation
 .github/workflows/deploy.yml build, scan, plan; on main, apply and ship
 .github/dependabot.yml       actions, npm (root and backend), Terraform
 .checkov.yml                 the IaC scan's configuration
@@ -161,5 +163,5 @@ cd backend && npm test
 ```
 
 ```bash
-terraform fmt -check -recursive && terraform init -backend=false && terraform validate
+terraform fmt -check -recursive && terraform init -backend=false && terraform validate && terraform test
 ```
