@@ -38,10 +38,13 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
     const content = contentRef.current;
     const focused = document.activeElement;
     if (!content.contains(focused)) return;
+    // Keep the focus outline clear of the edges by the same gutter the
+    // stylesheet scroll-pads with (--focus-gutter).
+    const gutter = parseFloat(getComputedStyle(content).scrollPaddingTop) || 0;
     const control = focused.getBoundingClientRect();
     const viewport = content.getBoundingClientRect();
-    if (control.bottom > viewport.bottom - 4) content.scrollTop += control.bottom - viewport.bottom + 4;
-    else if (control.top < viewport.top + 4) content.scrollTop -= viewport.top - control.top + 4;
+    if (control.bottom > viewport.bottom - gutter) content.scrollTop += control.bottom - viewport.bottom + gutter;
+    else if (control.top < viewport.top + gutter) content.scrollTop -= viewport.top - control.top + gutter;
   }, [notice, hasUndo]);
 
   return (

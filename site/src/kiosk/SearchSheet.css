@@ -33,7 +33,11 @@
   min-width: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding: 4px;
+  /* The focus gutter (styles.css), taken out of the sheet's own padding at the
+     sides so the list keeps its width. */
+  padding: var(--focus-gutter);
+  margin: 0 calc(4px - var(--focus-gutter));
+  scroll-padding: var(--focus-gutter);
   scrollbar-color: var(--line) var(--panel);
 }
 
