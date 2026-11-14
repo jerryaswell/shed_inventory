@@ -171,3 +171,54 @@ test('when a focused Undo goes away, focus returns to the title, inside the dial
   await mount({ notice: 'Updated Work gloves.', undoLeft: 0, onUndo: () => {} });
   expect(document.activeElement).toBe(host.querySelector('h1'));
 });
+
+// jsdom lays nothing out, so the notice is made to overflow its box by hand.
+// In a browser that makes it a scroller, which is a Tab stop of its own.
+function overflow(element) {
+  Object.defineProperty(element, 'scrollHeight', { configurable: true, value: 151 });
+  Object.defineProperty(element, 'clientHeight', { configurable: true, value: 141 });
+  element.tabIndex = 0;
+}
+
+const pressTab = async (element, shiftKey = false) => {
+  const tab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+  await act(async () => element.dispatchEvent(tab));
+  return tab.defaultPrevented;
+};
+
+test('Shift+Tab from Undo and from an overflowing notice moves back toward the inventory, not between them', async () => {
+  await mount({ notice: 'Updated LED bulbs (A19, 60W equivalent).', undoLeft: 10, onUndo: () => {} });
+  const notice = host.querySelector('[role="status"]');
+  overflow(notice);
+  const undo = host.querySelector('.undo');
+  undo.focus();
+  // The browser moves focus back to the notice, and from there to the last row.
+  expect(await pressTab(undo, true)).toBe(false);
+  notice.focus();
+  expect(await pressTab(notice, true)).toBe(false);
+  // Undo is still the last stop, so forward Tab from it wraps.
+  undo.focus();
+  expect(await pressTab(undo)).toBe(true);
+  expect(document.activeElement).toBe(button('Close search'));
+  expect(await pressTab(button('Close search'), true)).toBe(true);
+  expect(document.activeElement).toBe(undo);
+});
+
+test('an overflowing notice with no Undo is the last stop in both directions', async () => {
+  await mount({ notice: 'Updated LED bulbs (A19, 60W equivalent).' });
+  const notice = host.querySelector('[role="status"]');
+  overflow(notice);
+  const first = button('Close search');
+  const lastControl = button('Add one pair to Work gloves');
+  // The browser moves on from the last row to the notice.
+  lastControl.focus();
+  expect(await pressTab(lastControl)).toBe(false);
+  notice.focus();
+  expect(await pressTab(notice)).toBe(true);
+  expect(document.activeElement).toBe(first);
+  expect(await pressTab(first, true)).toBe(true);
+  expect(document.activeElement).toBe(notice);
+  host.querySelector('h1').focus();
+  expect(await pressTab(host.querySelector('h1'), true)).toBe(true);
+  expect(document.activeElement).toBe(notice);
+});
