@@ -75,7 +75,9 @@ test.each([
   [1, 'pair', '1 pair'],
   [3, 'pair', '3 pairs'],
   [2, 'bottle', '2 bottles'],
-  [4, 'roll', '4 rolls']
+  [4, 'roll', '4 rolls'],
+  [2, 'brush', '2 brushes'],
+  [5, 'glass', '5 glasses']
 ])('describeStock includes the unit for %i %s', (quantity, unit, expected) => {
   expect(describeStock({ kind: 'stock', quantity, unit })).toBe(expected);
 });

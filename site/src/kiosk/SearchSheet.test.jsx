@@ -48,7 +48,7 @@ async function mount(props = {}, strict = false) {
 const button = (label) => [...host.querySelectorAll('button')].find((element) => element.getAttribute('aria-label') === label || element.textContent === label);
 const rowFor = (name) => [...host.querySelectorAll('.row')].find((row) => row.querySelector('.row-name').textContent === name);
 
-test.each([false, true])('opens a named modal, focuses labelled search, and restores its opener (Strict Mode: %s)', async (strict) => {
+test.each([false, true])('opens a named modal, focuses its title, labels search, and restores its opener (Strict Mode: %s)', async (strict) => {
   await mount({}, strict);
   const dialog = host.querySelector('dialog');
   const input = host.querySelector('input');
@@ -57,7 +57,8 @@ test.each([false, true])('opens a named modal, focuses labelled search, and rest
   expect(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent).toBe('Browse items');
   expect(document.getElementById(dialog.getAttribute('aria-describedby')).textContent).toBe('Sample inventory. Not saved.');
   expect(input.labels[0].textContent).toBe('Search items');
-  expect(document.activeElement).toBe(input);
+  // The title, so the on-screen keyboard does not open over the list.
+  expect(document.activeElement).toBe(host.querySelector('h1'));
 
   await act(async () => button('Close search').click());
   expect(host.querySelector('dialog')).toBeNull();
@@ -152,4 +153,21 @@ test('feedback renders one Undo and follows remaining time without reopening or 
   await mount({ notice: 'Last change undone.', undoLeft: 0, onUndo });
   expect(host.querySelector('.undo')).toBeNull();
   expect(host.querySelector('[role="status"]').textContent).toBe('Last change undone.');
+});
+
+test('Shift+Tab from the title wraps to the last control rather than leaving the dialog', async () => {
+  await mount();
+  const title = host.querySelector('h1');
+  expect(document.activeElement).toBe(title);
+  const reverseTab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+  await act(async () => title.dispatchEvent(reverseTab));
+  expect(reverseTab.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(button('Add one pair to Work gloves'));
+});
+
+test('when a focused Undo goes away, focus returns to the title, inside the dialog', async () => {
+  await mount({ notice: 'Updated Work gloves.', undoLeft: 3, onUndo: () => {} });
+  host.querySelector('.undo').focus();
+  await mount({ notice: 'Updated Work gloves.', undoLeft: 0, onUndo: () => {} });
+  expect(document.activeElement).toBe(host.querySelector('h1'));
 });

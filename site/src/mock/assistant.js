@@ -12,7 +12,7 @@
  * the pick and applies the change. Here, a few keyword rules do the picking.
  * None of this file ships behind a deployed API.
  */
-import { describeStock, search } from '../core/inventory.js';
+import { describeStock, plural, search } from '../core/inventory.js';
 
 const NUMBERS = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, couple: 2 };
 const FILLER = new Set(['i', 'im', 'am', 'the', 'a', 'an', 'my', 'some', 'any', 'of', 'do', 'have', 'we', 'is', 'are', 'where', 'wheres', 'whats', 'find', 'looking', 'for', 'taking', 'take', 'took', 'grabbing', 'returning', 'return', 'putting', 'back', 'brought', 'got', 'it', 'there', 'please', 'out']);
@@ -54,7 +54,7 @@ export function resolve(item, action, quantity, heard) {
   }
   const delta = action === 'take' ? -quantity : quantity;
   const left = Math.max(0, item.quantity + delta);
-  const unit = left === 1 ? item.unit : `${item.unit}s`;
+  const unit = left === 1 ? item.unit : plural(item.unit);
   const verb = action === 'take' ? 'Took' : 'Put back';
   return {
     action, heard, itemId: item.id, change: { itemId: item.id, delta },

@@ -5,24 +5,29 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { X, Minus, Plus, Search, Undo2 } from 'lucide-react';
 import { byArea, describeStock, isLow, search } from '../core/inventory.js';
+import { useFocusRescue } from './useFocusRescue.js';
 import './SearchSheet.css';
 
 export default function SearchSheet({ items, onClose, onChange, notice, undoLeft = 0, onUndo }) {
   const [query, setQuery] = useState('');
   const dialogRef = useRef(null);
   const contentRef = useRef(null);
-  const searchRef = useRef(null);
+  const titleRef = useRef(null);
   const titleId = useId();
   const descriptionId = useId();
   const searchId = useId();
   const groups = byArea(search(items, query));
   const hasUndo = undoLeft > 0;
+  // When Undo is used or runs out while focused, focus returns to the title.
+  const onFocus = useFocusRescue(titleRef);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement;
     dialog.showModal();
-    searchRef.current.focus({ preventScroll: true });
+    // The title, not the search field: focusing a field raises the on-screen
+    // keyboard on the kiosk's touchscreen and hides half the list.
+    titleRef.current.focus({ preventScroll: true });
     return () => {
       dialog.close();
       if (opener?.isConnected) opener.focus({ preventScroll: true });
@@ -42,24 +47,25 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
   return (
     <dialog
       ref={dialogRef}
-      className="sheet inventory-dialog"
+      className="sheet"
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
+      onFocus={onFocus}
       onKeyDown={(event) => {
         if (event.key !== 'Tab') return;
-        const controls = event.currentTarget.querySelectorAll('button:enabled, input:enabled');
-        const first = controls[0];
-        const last = controls[controls.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
+        const controls = [...event.currentTarget.querySelectorAll('button:enabled, input:enabled')];
+        const at = controls.indexOf(document.activeElement);
+        // From the title (not a control) Shift+Tab would leave the page.
+        if (event.shiftKey && at <= 0) {
           event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
+          controls.at(-1).focus();
+        } else if (!event.shiftKey && at === controls.length - 1) {
           event.preventDefault();
-          first.focus();
+          controls[0].focus();
         }
       }}
     >
@@ -67,7 +73,7 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
       <div ref={contentRef} className="sheet-content">
         <div className="sheet-head">
           <div className="sheet-title-row">
-            <h1 id={titleId} className="sheet-title">Browse items</h1>
+            <h1 id={titleId} ref={titleRef} tabIndex={-1} className="sheet-title">Browse items</h1>
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Close search">
               <X size={28} aria-hidden="true" />
             </button>
@@ -77,7 +83,6 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
             <div className="sheet-search">
               <Search size={22} aria-hidden="true" />
               <input
-                ref={searchRef}
                 id={searchId}
                 type="search"
                 placeholder="Name or location"

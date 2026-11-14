@@ -11,15 +11,17 @@ const COPY = {
   thinking: 'Finding sample items…'
 };
 
-export default function MicButton({ phase, onTap, compact = false }) {
+export default function MicButton({ phase, onTap, compact = false, buttonRef }) {
   const Icon = phase === 'listening' ? ArrowRight : phase === 'thinking' ? Loader : Mic;
   return (
     <div className={`mic-wrap${compact ? ' mic-wrap-compact' : ''}`}>
       <button
         type="button"
         className={`mic mic-${phase}${compact ? ' mic-compact' : ''}`}
+        ref={buttonRef}
         onClick={onTap}
-        disabled={phase === 'thinking'}
+        // aria-disabled, not disabled: a disabled button drops keyboard focus.
+        aria-disabled={phase === 'thinking' || undefined}
         aria-label={COPY[phase]}
       >
         <Icon size={compact ? 28 : 52} strokeWidth={1.5} aria-hidden="true" />

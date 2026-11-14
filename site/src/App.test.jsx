@@ -81,7 +81,11 @@ test('the sample action makes its simulated and busy states explicit before find
   expect(button('Run sample now')).toBeDefined();
   await advance(1000);
   expect(host.textContent).toContain('Finding sample items');
-  expect(button('Finding sample items').disabled).toBe(true);
+  // Busy, but still focusable: aria-disabled, and a tap does nothing.
+  expect(button('Finding sample items').getAttribute('aria-disabled')).toBe('true');
+  expect(button('Finding sample items').disabled).toBe(false);
+  await act(async () => button('Finding sample items').click());
+  expect(host.textContent).toContain('Finding sample items');
   await advance(100);
   expect(host.textContent).toContain('Cordless drill');
   expect(host.textContent).toContain('Pegboard');
@@ -280,26 +284,26 @@ test('a result shows the item, location, and stock once with Undo outside the sc
   expect(reply.querySelector('h2').textContent).toBe('Cordless drill');
   expect(reply.textContent.match(/Pegboard/g)).toHaveLength(1);
   expect(reply.textContent.match(/Left side/g)).toHaveLength(1);
-  expect(reply.textContent.match(/in the shed/g)).toHaveLength(1);
+  expect(reply.textContent.match(/in the shed/gi)).toHaveLength(1);
 
   await speak();
   expect(host.querySelector('.reply-summary').textContent).toBe('Taken');
-  expect(host.querySelector('.reply-stock').textContent).toBe('out of the shed');
+  expect(host.querySelector('.reply-stock').textContent).toBe('Out of the shed');
   expect(host.querySelector('.stage button.undo')).toBeNull();
   expect(host.querySelector('.foot button.undo')).not.toBeNull();
   expect(button('Undo').querySelector('.undo-left').getAttribute('aria-hidden')).toBe('true');
   await click('Undo');
   expect(host.querySelector('.reply-name').textContent).toBe('Cordless drill');
-  expect(host.querySelector('.reply-stock').textContent).toBe('in the shed');
+  expect(host.querySelector('.reply-stock').textContent).toBe('In the shed');
 });
 
 test('a tool return identifies the action and Undo restores its checked-out state', async () => {
   await mount();
   for (let i = 0; i < 5; i++) await speak();
   expect(host.querySelector('.reply-summary').textContent).toBe('Returned');
-  expect(host.querySelector('.reply-stock').textContent).toBe('in the shed');
+  expect(host.querySelector('.reply-stock').textContent).toBe('In the shed');
   await click('Undo');
-  expect(host.querySelector('.reply-stock').textContent).toBe('out of the shed');
+  expect(host.querySelector('.reply-stock').textContent).toBe('Out of the shed');
 });
 
 test('keyboard activity keeps the kiosk awake for a full idle period', async () => {
@@ -323,4 +327,47 @@ test('the motion control pauses the integrated background and saves the preferen
   await act(async () => control.click());
   expect(host.querySelector('.ambient-background').dataset.paused).toBe('false');
   expect(localStorage.getItem('shed-ambient-motion-paused')).toBe('false');
+});
+
+test('focus stays on the mic while it is busy, and moves to the answer when Undo goes', async () => {
+  await mount();
+  const mic = host.querySelector('button.mic');
+  mic.focus();
+  await act(async () => mic.click());
+  await advance(1000);
+  expect(document.activeElement).toBe(mic); // busy, not disabled
+  await advance(100);
+  await speak(); // takes the drill
+  const undo = host.querySelector('.foot button.undo');
+  undo.focus();
+  await act(async () => undo.click());
+  expect(document.activeElement).toBe(host.querySelector('.reply'));
+});
+
+test('focus moves to the answer when a focused Undo runs out', async () => {
+  await mount();
+  await speak();
+  await speak(); // takes the drill
+  host.querySelector('.foot button.undo').focus();
+  await advance(10_500);
+  expect(host.querySelector('.foot button.undo')).toBeNull();
+  expect(document.activeElement).toBe(host.querySelector('.reply'));
+});
+
+test('picking a "which one" choice keeps focus on the answer', async () => {
+  await mount();
+  for (let i = 0; i < 4; i++) await speak();
+  const option = host.querySelector('.reply-options button');
+  option.focus();
+  await act(async () => option.click());
+  expect(document.activeElement).toBe(host.querySelector('.reply'));
+});
+
+test('the answer is announced from a live region that was already there', async () => {
+  await mount();
+  const region = host.querySelector('.reply-region');
+  expect(region.getAttribute('aria-live')).toBe('polite');
+  await speak();
+  expect(host.querySelector('.reply-region')).toBe(region);
+  expect(region.querySelector('.reply')).not.toBeNull();
 });

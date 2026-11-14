@@ -13,12 +13,16 @@ const SUMMARY = {
   undone: 'Change undone'
 };
 
-export default function Reply({ result, items, onPick }) {
+const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+export default function Reply({ result, items, onPick, sectionRef }) {
   if (!result) return null;
   const item = result.itemId ? items.find((i) => i.id === result.itemId) : null;
   const showMessage = !item || result.action === 'unknown';
   return (
-    <section className={`reply reply-${result.action}`} aria-live="polite" aria-atomic="true">
+    // tabIndex -1: focus lands here when the control that had it goes away.
+    // The live region around it (App.jsx) announces it.
+    <section ref={sectionRef} tabIndex={-1} className={`reply reply-${result.action}`}>
       {showMessage && (
         <>
           {result.heard && <p className="reply-heard">Sample: “{result.heard}”</p>}
@@ -41,7 +45,7 @@ export default function Reply({ result, items, onPick }) {
               </div>
             </div>
             <div className={`reply-stock${isLow(item) ? ' low' : ''}`}>
-              <span>{describeStock(item)}</span>
+              <span>{capital(describeStock(item))}</span>
               {isLow(item) && <span className="reply-low"><AlertTriangle size={18} aria-hidden="true" />Low stock</span>}
             </div>
           </div>

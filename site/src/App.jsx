@@ -23,6 +23,7 @@ import Screensaver from './kiosk/Screensaver.jsx';
 import { useNow } from './kiosk/useNow.js';
 import AmbientBackground from './kiosk/AmbientBackground.jsx';
 import { useAmbientMotion } from './kiosk/useAmbientMotion.js';
+import { useFocusRescue } from './kiosk/useFocusRescue.js';
 
 const UNDO_MS = 10_000;
 const IDLE_MS = 90_000;
@@ -49,6 +50,11 @@ export default function App({
   const timer = useRef(null);
   const heardNext = useRef(null);
   const scriptAt = useRef(0);
+  const micRef = useRef(null);
+  const replyRef = useRef(null);
+  // The answer, or the mic when there is none. The browse dialog keeps its own.
+  const fallbackRef = result ? replyRef : micRef;
+  const onFocus = useFocusRescue(fallbackRef, { ignore: (el) => el.closest('dialog') != null });
 
   useEffect(() => {
     itemsRef.current = items;
@@ -93,6 +99,7 @@ export default function App({
   };
 
   const onMic = () => {
+    if (phase === 'thinking') return;
     if (phase === 'listening') {
       hear(heardNext.current);
       return;
@@ -136,7 +143,12 @@ export default function App({
   const MotionIcon = motion.userPaused ? Play : Pause;
 
   return (
-    <div className="kiosk" onPointerDownCapture={() => setLastTouch(clock())} onKeyDownCapture={() => setLastTouch(clock())}>
+    <div
+      className="kiosk"
+      onPointerDownCapture={() => setLastTouch(clock())}
+      onKeyDownCapture={() => setLastTouch(clock())}
+      onFocus={onFocus}
+    >
       <AmbientBackground paused={motion.paused} sleeping={sleeping} />
       <div className="kiosk-content">
         <StatusBar status={status} now={now} controls={
@@ -155,16 +167,17 @@ export default function App({
         <p className="banner">Sample inventory. Nothing is saved. No audio is recorded.</p>
 
         <main className={`stage${result ? ' stage-result' : ''}`} aria-label="Inventory demo">
-          <MicButton phase={phase} onTap={onMic} compact={result != null} />
-          {result ? (
-            <Reply result={result} items={items} onPick={onPick} />
-          ) : (
-            phase === 'idle' && (
-              <section className="example" aria-label="Sample request">
-                <p className="example-label">First sample</p>
-                <p className="example-text">“{demoScript[0]}”</p>
-              </section>
-            )
+          <MicButton phase={phase} onTap={onMic} compact={result != null} buttonRef={micRef} />
+          {/* Always mounted, so an answer is announced: a live region that
+              arrives together with its content often is not. */}
+          <div className="reply-region" aria-live="polite" aria-atomic="true">
+            {result && <Reply result={result} items={items} onPick={onPick} sectionRef={replyRef} />}
+          </div>
+          {!result && phase === 'idle' && (
+            <section className="example" aria-label="Sample request">
+              <p className="example-label">First sample</p>
+              <p className="example-text">“{demoScript[0]}”</p>
+            </section>
           )}
         </main>
       </div>
