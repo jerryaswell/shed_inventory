@@ -29,8 +29,9 @@ and adjust the sample inventory. Each change offers Undo for ten seconds. API
 connectivity is shown separately from the sample-data disclosure.
 
 **Pause motion** stops the decorative background and remembers the setting on
-that browser. Device reduced-motion preferences also stop animation; hidden
-tabs and the idle screen pause the background automatically.
+that browser. The home and lock screens share the same slowly drifting and
+pulsing background. Device reduced-motion preferences also stop animation;
+hidden tabs pause it automatically.
 
 ## Layout
 
@@ -129,8 +130,10 @@ features need its one-time Plus licence). It is set up entirely on the phone:
 - Android: turn off battery optimisation for Fully, turn on **Protect
   battery** (stops charging at 85%), and set a weekly auto restart.
 
-The page goes almost black after a minute and a half untouched, with a dim
-clock that moves, because the OLED screen burns in a static image. Check
+After a minute and a half untouched, the controls hide behind a lock screen
+with the same ambient background and a clock that shifts each minute. The
+background pulses gently over 34 to 58 seconds, independently of the slower
+drift. Pause motion and reduced-motion preferences apply on both screens. Check
 smoothness, heat, battery use and Android text scaling on the actual phone
 before leaving the animated background running for long periods.
 

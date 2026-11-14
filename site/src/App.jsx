@@ -191,7 +191,7 @@ export default function App({
   const busy = phase === 'listening' || phase === 'thinking';
   useDeadline(busy || idle ? null : lastTouch + IDLE_MS, clock, () => setIdle(true));
   const sleeping = !busy && idle;
-  const motion = useAmbientMotion({ sleeping });
+  const motion = useAmbientMotion();
   const MotionIcon = motion.userPaused ? Play : Pause;
 
   // While asleep the saver holds focus and everything under it is inert, so a
@@ -215,12 +215,13 @@ export default function App({
   return (
     <div
       className="kiosk"
+      data-sleeping={sleeping}
       onPointerDownCapture={touch}
       // Asleep, a key is the saver's to handle: it wakes on the key's release.
       onKeyDownCapture={() => sleeping || touch()}
       onFocus={onFocus}
     >
-      <AmbientBackground paused={motion.paused} sleeping={sleeping} />
+      <AmbientBackground paused={motion.paused} />
       <div ref={contentRef} className="kiosk-content" inert={sleeping}>
         <StatusBar status={status} clock={clock} controls={
           <button

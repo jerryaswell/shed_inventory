@@ -3,15 +3,14 @@ import './AmbientBackground.css';
 /**
  * Mount inside a positioned parent with isolation: isolate. Its negative
  * stacking level then stays above the parent background and below controls.
- * Pass the effective paused state from useAmbientMotion and the kiosk's real
- * sleeping state; sleep also hides every colour field behind the black saver.
+ * Share this mounted layer between the kiosk and its lock screen so the
+ * composition keeps moving continuously when the controls are hidden.
  */
-export default function AmbientBackground({ paused = false, sleeping = false }) {
+export default function AmbientBackground({ paused = false }) {
   return (
     <div
       className="ambient-background"
-      data-paused={paused || sleeping}
-      data-sleeping={sleeping}
+      data-paused={paused}
       aria-hidden="true"
     >
       <div className="ambient-field ambient-field-blue" />

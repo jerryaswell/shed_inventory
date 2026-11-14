@@ -28,6 +28,7 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
   localStorage.clear();
   for (const name of ['showModal', 'close']) {
@@ -288,18 +289,43 @@ test.each([
   expect(stockCount(ledName)).toBe(12);
 });
 
-test('the screensaver comes on after a minute and a half untouched, and a tap wakes it', async () => {
+test('the lock screen keeps the same unpaused background after 90 seconds and a tap wakes it', async () => {
   await mount();
+  const background = host.querySelector('.ambient-background');
   await advance(89_000);
   expect(host.querySelector('.saver')).toBeNull();
   await advance(2_000);
   expect(host.querySelector('.saver')).not.toBeNull();
-  expect(host.querySelector('.ambient-background').dataset.sleeping).toBe('true');
-  expect(host.querySelector('.ambient-background').dataset.paused).toBe('true');
+  expect(host.querySelector('.kiosk').dataset.sleeping).toBe('true');
+  expect(host.querySelectorAll('.ambient-background')).toHaveLength(1);
+  expect(host.querySelector('.ambient-background')).toBe(background);
+  expect(background.dataset.paused).toBe('false');
   await act(async () => button('Wake the screen').click());
-  await advance(500);
   expect(host.querySelector('.saver')).toBeNull();
-  expect(host.querySelector('.ambient-background').dataset.paused).toBe('false');
+  expect(host.querySelector('.ambient-background')).toBe(background);
+  expect(background.dataset.paused).toBe('false');
+});
+
+test.each(['manual pause', 'reduced motion', 'hidden page'])('the lock screen respects %s without replacing the saved preference', async (reason) => {
+  let hidden;
+  if (reason === 'manual pause') localStorage.setItem('shed-ambient-motion-paused', 'true');
+  if (reason === 'reduced motion') {
+    const media = new EventTarget();
+    media.matches = true;
+    vi.stubGlobal('matchMedia', () => media);
+  }
+  if (reason === 'hidden page') hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  await mount();
+  await advance(91_000);
+  expect(host.querySelector('.saver')).not.toBeNull();
+  expect(host.querySelector('.ambient-background').dataset.paused).toBe('true');
+  expect(localStorage.getItem('shed-ambient-motion-paused')).toBe(String(reason === 'manual pause'));
+  if (hidden) {
+    hidden.mockReturnValue(false);
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  }
+  await click('Wake the screen');
+  expect(host.querySelector('.ambient-background').dataset.paused).toBe(String(reason !== 'hidden page'));
 });
 
 test.each([
@@ -336,7 +362,7 @@ test('Browse left open sleeps too, and waking reopens it with its search, scroll
   // A modal dialog sits in the top layer, above any saver: it is closed, not
   // covered, while the kiosk sleeps, and stays mounted so nothing is lost.
   expect(host.querySelector('.saver')).not.toBeNull();
-  expect(host.querySelector('.ambient-background').dataset.sleeping).toBe('true');
+  expect(host.querySelector('.kiosk').dataset.sleeping).toBe('true');
   expect(host.querySelector('dialog.sheet')).toBe(dialog);
   expect(dialog.open).toBe(false);
   expect(document.activeElement).toBe(host.querySelector('.saver'));

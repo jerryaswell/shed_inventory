@@ -240,12 +240,16 @@ button svg { flex-shrink: 0; }
 }
 
 /* ---- screensaver ---- */
+.kiosk[data-sleeping='true'] > .kiosk-content,
+.kiosk[data-sleeping='true'] > .foot {
+  visibility: hidden;
+}
 .saver {
   position: fixed;
   inset: 0;
   z-index: 20;
   border: none;
-  background: #000;
+  background: transparent;
   display: grid;
   place-items: center;
 }
@@ -255,11 +259,11 @@ button svg { flex-shrink: 0; }
   align-items: center;
   font-size: 56px;
   font-weight: 300;
-  color: #3a3f45;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
   transition: transform 2s;
 }
-.saver-hint { font-size: 15px; color: #2a2e33; margin-top: 6px; }
+.saver-hint { font-size: 15px; color: var(--muted); margin-top: 6px; }
 
 @media (prefers-reduced-motion: reduce) {
   .mic, .mic-thinking svg { animation: none; }

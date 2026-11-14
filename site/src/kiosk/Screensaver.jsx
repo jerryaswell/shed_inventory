@@ -1,7 +1,7 @@
 /**
- * The idle screen. The Note 10's OLED panel burns in a static image, so after
- * a minute and a half untouched the kiosk goes almost black, with a dim clock
- * that moves a little every minute. Any tap or key wakes it, and only wakes
+ * The idle lock screen. After a minute and a half untouched, the controls
+ * give way to the shared ambient background and a clock that shifts a little
+ * every minute. Any tap or key wakes it, and only wakes
  * it: the kiosk gives it focus and makes the page under it inert, and a key
  * press is consumed here. A key wakes it on release, not on press: waking
  * hands focus back to the page, and a press that is still going on (Enter's
