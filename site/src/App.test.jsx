@@ -27,6 +27,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  vi.restoreAllMocks();
   vi.useRealTimers();
   localStorage.clear();
   for (const name of ['showModal', 'close']) {
@@ -471,6 +472,47 @@ test('focus moves to the answer when a focused Undo runs out', async () => {
   await advance(10_500);
   expect(host.querySelector('.foot button.undo')).toBeNull();
   expect(document.activeElement).toBe(host.querySelector('.reply'));
+});
+
+/**
+ * jsdom lays nothing out, so give the content a 400px viewport scroll-padded
+ * by 8px, and every answer a 300px box starting 550px down its scroll height:
+ * below the fold, as on a small phone with large text. Shown least-scrolled,
+ * clear of the edge by the gutter, it ends 8px above the viewport's bottom.
+ */
+function layOutBelowTheFold() {
+  const content = host.querySelector('.kiosk-content');
+  content.style.scrollPaddingTop = '8px';
+  const rect = (top, height) => ({ top, bottom: top + height, height, left: 0, right: 300, width: 300, x: 0, y: top });
+  vi.spyOn(content, 'getBoundingClientRect').mockImplementation(() => rect(0, 400));
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    return this.classList.contains('reply') ? rect(550 - content.scrollTop, 300) : rect(0, 0);
+  });
+  return content;
+}
+
+const insideContent = (content) => {
+  const reply = host.querySelector('.reply').getBoundingClientRect();
+  const viewport = content.getBoundingClientRect();
+  return reply.top >= viewport.top + 8 && reply.bottom <= viewport.bottom - 8;
+};
+
+test.each([
+  ['used', async () => host.querySelector('.foot button.undo').click()],
+  ['run out', async () => {
+    time += 10_500;
+    vi.advanceTimersByTime(10_500);
+  }]
+])('an answer below the fold is scrolled into view when a focused Undo is %s', async (_, end) => {
+  await mount();
+  await speak();
+  await speak(); // takes the drill
+  const content = layOutBelowTheFold();
+  host.querySelector('.foot button.undo').focus();
+  await act(end);
+  expect(document.activeElement).toBe(host.querySelector('.reply'));
+  expect(content.scrollTop).toBe(458);
+  expect(insideContent(content)).toBe(true);
 });
 
 test('picking a "which one" choice keeps focus on the answer', async () => {

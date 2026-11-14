@@ -54,10 +54,15 @@ export default function App({
   const replyRef = useRef(null);
   const saverRef = useRef(null);
   const wakeFocus = useRef(null);
-  // The answer, or the mic when there is none. The browse dialog keeps its
-  // own, and the saver hands focus back itself (below).
+  const contentRef = useRef(null);
+  // The answer, or the mic when there is none, scrolled into view in the
+  // content. The browse dialog keeps its own, and the saver hands focus back
+  // itself (below).
   const fallbackRef = result ? replyRef : micRef;
-  const onFocus = useFocusRescue(fallbackRef, { ignore: (el) => el.closest('dialog, .saver') != null });
+  const onFocus = useFocusRescue(fallbackRef, {
+    ignore: (el) => el.closest('dialog, .saver') != null,
+    scrollerRef: contentRef
+  });
 
   useEffect(() => {
     itemsRef.current = items;
@@ -174,7 +179,7 @@ export default function App({
       onFocus={onFocus}
     >
       <AmbientBackground paused={motion.paused} sleeping={sleeping} />
-      <div className="kiosk-content" inert={sleeping}>
+      <div ref={contentRef} className="kiosk-content" inert={sleeping}>
         <StatusBar status={status} now={now} controls={
           <button
             type="button"
