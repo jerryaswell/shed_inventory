@@ -196,6 +196,7 @@ State is `s3://jerryaswell-terraform-state/shed_inventory/terraform.tfstate`.
 
 `npm run lint`, `npm test` and `npm run test:scripts` at the root, and
 `npm test` in `backend/`, as the `build` and `build-backend` jobs run them.
-`terraform fmt -check -recursive` and `terraform validate` for any Terraform
+`terraform fmt -check -recursive`, `terraform validate` and `terraform test`
+(the mocked tests in `tests/`, as the `plan` job runs them) for any Terraform
 change. A pull request that adds, renames or removes a root `.tf` file, a
 module, a script, a workflow or a doc updates the Layout block in `README.md`.
