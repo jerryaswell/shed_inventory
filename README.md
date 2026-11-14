@@ -24,6 +24,14 @@ npm run dev
 Open http://localhost:5173. The dev server also listens on your network, so
 the phone can open `http://<laptop-ip>:5173` over Wi-Fi.
 
+Use **Try a sample** to run the scripted requests, or **Browse items** to search
+and adjust the sample inventory. Each change offers Undo for ten seconds. API
+connectivity is shown separately from the sample-data disclosure.
+
+**Pause motion** stops the decorative background and remembers the setting on
+that browser. Device reduced-motion preferences also stop animation; hidden
+tabs and the idle screen pause the background automatically.
+
 ## Layout
 
 ```
@@ -37,8 +45,8 @@ site/                        the kiosk page; Vite builds it into dist/
       inventory.js           items, and changes as records that can be undone
       config.js              /config.json, which the deploy writes; none = sample mode
       api.js                 calls to the backend (the health check so far)
-    kiosk/                   the mic button, answer card, search sheet,
-                               screensaver, status line
+    kiosk/                   the sample button, answer card, browse dialog,
+                               ambient background, screensaver, status line
     mock/
       sampleInventory.js     a made-up shed, and the mic's script
       assistant.js           stands in for the voice route, in its shape
@@ -119,7 +127,9 @@ features need its one-time Plus licence). It is set up entirely on the phone:
   battery** (stops charging at 85%), and set a weekly auto restart.
 
 The page goes almost black after a minute and a half untouched, with a dim
-clock that moves, because the OLED screen burns in a static image.
+clock that moves, because the OLED screen burns in a static image. Check
+smoothness, heat, battery use and Android text scaling on the actual phone
+before leaving the animated background running for long periods.
 
 ## What comes next
 

@@ -55,6 +55,7 @@ test.each([false, true])('opens a named modal, focuses labelled search, and rest
   expect(dialog.open).toBe(true);
   expect(showModal).toHaveBeenCalled();
   expect(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent).toBe('Browse items');
+  expect(document.getElementById(dialog.getAttribute('aria-describedby')).textContent).toBe('Sample inventory. Not saved.');
   expect(input.labels[0].textContent).toBe('Search items');
   expect(document.activeElement).toBe(input);
 

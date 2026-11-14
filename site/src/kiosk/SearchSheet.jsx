@@ -13,6 +13,7 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
   const contentRef = useRef(null);
   const searchRef = useRef(null);
   const titleId = useId();
+  const descriptionId = useId();
   const searchId = useId();
   const groups = byArea(search(items, query));
   const hasUndo = undoLeft > 0;
@@ -43,6 +44,7 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
       ref={dialogRef}
       className="sheet inventory-dialog"
       aria-labelledby={titleId}
+      aria-describedby={descriptionId}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -61,6 +63,7 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
         }
       }}
     >
+      <p id={descriptionId} className="sheet-disclosure">Sample inventory. Not saved.</p>
       <div ref={contentRef} className="sheet-content">
         <div className="sheet-head">
           <div className="sheet-title-row">

@@ -9,7 +9,7 @@
  * for the backend's voice route is what makes it work.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Search, Undo2 } from 'lucide-react';
+import { Pause, Play, Search, Undo2 } from 'lucide-react';
 import { loadConfig } from './core/config.js';
 import { checkHealth } from './core/api.js';
 import { applyChange, inverseOf } from './core/inventory.js';
@@ -21,6 +21,8 @@ import Reply from './kiosk/Reply.jsx';
 import SearchSheet from './kiosk/SearchSheet.jsx';
 import Screensaver from './kiosk/Screensaver.jsx';
 import { useNow } from './kiosk/useNow.js';
+import AmbientBackground from './kiosk/AmbientBackground.jsx';
+import { useAmbientMotion } from './kiosk/useAmbientMotion.js';
 
 const UNDO_MS = 10_000;
 const IDLE_MS = 90_000;
@@ -130,11 +132,26 @@ export default function App({
   const undoLeft = undo ? Math.min(UNDO_MS / 1000, Math.max(0, Math.ceil((undo.until - now) / 1000))) : 0;
   const busy = phase === 'listening' || phase === 'thinking';
   const sleeping = !sheetOpen && !busy && now - lastTouch > IDLE_MS;
+  const motion = useAmbientMotion({ sleeping });
+  const MotionIcon = motion.userPaused ? Play : Pause;
 
   return (
     <div className="kiosk" onPointerDownCapture={() => setLastTouch(clock())} onKeyDownCapture={() => setLastTouch(clock())}>
+      <AmbientBackground paused={motion.paused} sleeping={sleeping} />
       <div className="kiosk-content">
-        <StatusBar status={status} now={now} />
+        <StatusBar status={status} now={now} controls={
+          <button
+            type="button"
+            className="motion-toggle"
+            onClick={motion.togglePause}
+            disabled={motion.reducedMotion}
+            aria-label={motion.reducedMotion ? 'Motion off: device prefers reduced motion' : undefined}
+            title={motion.reducedMotion ? 'Your device prefers reduced motion' : undefined}
+          >
+            <MotionIcon size={18} aria-hidden="true" />
+            {motion.reducedMotion ? 'Motion off' : motion.userPaused ? 'Resume motion' : 'Pause motion'}
+          </button>
+        } />
         <p className="banner">Sample inventory. Nothing is saved. No audio is recorded.</p>
 
         <main className={`stage${result ? ' stage-result' : ''}`} aria-label="Inventory demo">

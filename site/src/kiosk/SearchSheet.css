@@ -22,6 +22,13 @@
 .inventory-dialog[open] { display: flex; }
 .inventory-dialog::backdrop { background: #080b12e6; }
 
+.inventory-dialog .sheet-disclosure {
+  flex-shrink: 0;
+  margin: 0;
+  color: #a8b6c8;
+  font-size: 0.8rem;
+}
+
 .inventory-dialog .sheet-head {
   display: flex;
   flex-direction: column;

@@ -8,9 +8,16 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let host;
 let root;
 let time;
+const dialogMethods = Object.getOwnPropertyDescriptors(HTMLDialogElement.prototype);
 
 beforeEach(() => {
   vi.useFakeTimers();
+  localStorage.clear();
+  // jsdom has no native modal API; browser checks cover inertness and focus.
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: { configurable: true, value() { this.open = true; } },
+    close: { configurable: true, value() { this.open = false; } }
+  });
   time = 1_000_000;
   host = document.createElement('div');
   document.body.append(host);
@@ -21,6 +28,11 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   vi.useRealTimers();
+  localStorage.clear();
+  for (const name of ['showModal', 'close']) {
+    if (dialogMethods[name]) Object.defineProperty(HTMLDialogElement.prototype, name, dialogMethods[name]);
+    else delete HTMLDialogElement.prototype[name];
+  }
 });
 
 const sample = async () => null;
@@ -102,7 +114,7 @@ test('a vague request asks which one, the pick applies it, and Undo puts the cou
   expect(host.textContent).toContain('Change undone');
   await act(async () => button('Browse items').click());
   const led = [...host.querySelectorAll('.row')].find((r) => r.textContent.includes('LED bulbs'));
-  expect(led.querySelector('.row-count').textContent).toBe('12');
+  expect(led.querySelector('.row-count').textContent).toBe('12 bulbs');
 });
 
 test('Undo disappears after ten seconds', async () => {
@@ -118,12 +130,12 @@ test('Undo disappears after ten seconds', async () => {
 
 const rowFor = (name) => [...host.querySelectorAll('.row')].find((row) => row.querySelector('.row-name').textContent === name);
 const ledName = 'LED bulbs (A19, 60W equivalent)';
-const stockCount = (name) => Number(rowFor(name).querySelector('.row-count').textContent);
+const stockCount = (name) => Number.parseInt(rowFor(name).querySelector('.row-count').textContent, 10);
 const click = async (label) => act(async () => button(label).click());
 
 test.each([
-  ['One more', 13],
-  ['One fewer', 11]
+  ['Add one bulb to', 13],
+  ['Remove one bulb from', 11]
 ])('manual stock: %s offers Undo inside the browse sheet', async (control, count) => {
   await mount();
   await click('Browse items');
@@ -162,7 +174,7 @@ test('the latest manual edit replaces a previous voice Undo', async () => {
   await speak(); // takes the drill
   await click('Browse items');
   expect(host.querySelectorAll('button.undo')).toHaveLength(1);
-  await click(`One more ${ledName}`);
+  await click(`Add one bulb to ${ledName}`);
   await click('Undo');
 
   expect(stockCount(ledName)).toBe(12);
@@ -172,8 +184,8 @@ test('the latest manual edit replaces a previous voice Undo', async () => {
 test('Undo reverses only the latest of successive manual changes', async () => {
   await mount();
   await click('Browse items');
-  await click(`One more ${ledName}`);
-  await click('One more Wood glue');
+  await click(`Add one bulb to ${ledName}`);
+  await click('Add one bottle to Wood glue');
   await click('Undo');
 
   expect(stockCount('Wood glue')).toBe(2);
@@ -183,7 +195,7 @@ test('Undo reverses only the latest of successive manual changes', async () => {
 test('manual Undo remains available after closing the browse sheet', async () => {
   await mount();
   await click('Browse items');
-  await click(`One more ${ledName}`);
+  await click(`Add one bulb to ${ledName}`);
   await click('Close search');
   expect(host.querySelector('.foot button.undo')).not.toBeNull();
   await click('Undo');
@@ -195,7 +207,7 @@ test('manual Undo remains available after closing the browse sheet', async () =>
 test('closing and reopening browse does not extend manual Undo beyond ten seconds', async () => {
   await mount();
   await click('Browse items');
-  await click(`One more ${ledName}`);
+  await click(`Add one bulb to ${ledName}`);
   await advance(4000);
   await click('Close search');
   expect(button('Undo').textContent).toContain('6s');
@@ -211,7 +223,7 @@ test('closing and reopening browse does not extend manual Undo beyond ten second
 test('an Undo click after its deadline cannot beat the next clock render', async () => {
   await mount();
   await click('Browse items');
-  await click(`One more ${ledName}`);
+  await click(`Add one bulb to ${ledName}`);
   time += 10_001;
   await click('Undo');
   expect(stockCount(ledName)).toBe(13);
@@ -226,7 +238,7 @@ test.each([
   await act(async () => host.querySelector('button.mic').click());
   await advance(delay);
   await click('Browse items');
-  await click(`One more ${ledName}`);
+  await click(`Add one bulb to ${ledName}`);
   await advance(1100);
 
   expect(host.querySelector('.sheet [role="status"]').textContent).toBe(`Updated ${ledName}.`);
@@ -240,9 +252,12 @@ test('the screensaver comes on after a minute and a half untouched, and a tap wa
   expect(host.querySelector('.saver')).toBeNull();
   await advance(2_000);
   expect(host.querySelector('.saver')).not.toBeNull();
+  expect(host.querySelector('.ambient-background').dataset.sleeping).toBe('true');
+  expect(host.querySelector('.ambient-background').dataset.paused).toBe('true');
   await act(async () => button('Wake the screen').click());
   await advance(500);
   expect(host.querySelector('.saver')).toBeNull();
+  expect(host.querySelector('.ambient-background').dataset.paused).toBe('false');
 });
 
 test('home has one sample action, one example, and a persistent browse entry', async () => {
@@ -295,4 +310,17 @@ test('keyboard activity keeps the kiosk awake for a full idle period', async () 
   expect(host.querySelector('.saver')).toBeNull();
   await advance(89_000);
   expect(host.querySelector('.saver')).not.toBeNull();
+});
+
+test('the motion control pauses the integrated background and saves the preference', async () => {
+  await mount();
+  const control = host.querySelector('.motion-toggle');
+  expect(control.textContent).toBe('Pause motion');
+  await act(async () => control.click());
+  expect(control.textContent).toBe('Resume motion');
+  expect(host.querySelector('.ambient-background').dataset.paused).toBe('true');
+  expect(localStorage.getItem('shed-ambient-motion-paused')).toBe('true');
+  await act(async () => control.click());
+  expect(host.querySelector('.ambient-background').dataset.paused).toBe('false');
+  expect(localStorage.getItem('shed-ambient-motion-paused')).toBe('false');
 });
