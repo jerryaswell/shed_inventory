@@ -10,7 +10,6 @@
   --text: #eef2f7;
   --muted: #a8b6c8;
   --accent: #b8c7ff;
-  --accent-ink: #121923;
   --listen: #91c7cb;
   --ok: #96d7bc;
   --warn: #f0c688;
@@ -128,7 +127,7 @@ button svg { flex-shrink: 0; }
   display: grid;
   place-items: center;
   box-shadow: 0 0 0 8px rgb(184 199 255 / 0.05);
-  transition: transform 0.15s, background 0.2s;
+  transition: transform 0.15s;
 }
 .mic:active { transform: scale(0.96); }
 .mic-compact { width: 52px; height: 52px; box-shadow: none; }
