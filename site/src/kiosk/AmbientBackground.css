@@ -1,0 +1,82 @@
+.ambient-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: #080b12;
+  contain: strict;
+}
+
+.ambient-field {
+  position: absolute;
+  inset: -12%;
+  background-repeat: no-repeat;
+  will-change: transform;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.ambient-field-blue {
+  background-image: radial-gradient(ellipse 61% 58% at 33% 32%, #26466ec7 0%, #20365894 30%, #20365800 73%);
+  animation-name: ambient-blue;
+  animation-duration: 56s;
+}
+
+.ambient-field-indigo {
+  background-image: radial-gradient(ellipse 55% 57% at 72% 73%, #42365d91 0%, #302b4b66 34%, #302b4b00 77%);
+  animation-name: ambient-indigo;
+  animation-duration: 73s;
+}
+
+.ambient-field-teal {
+  background-image: radial-gradient(ellipse 56% 51% at 15% 83%, #214e5366 0%, #183b4047 30%, #183b4000 78%);
+  animation-name: ambient-teal;
+  animation-duration: 91s;
+}
+
+.ambient-background::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, #080b1266, transparent 35%, #080b1247),
+    radial-gradient(ellipse at center, transparent 30%, #080b1273 100%);
+}
+
+@keyframes ambient-blue {
+  from { transform: translate3d(-3%, -2%, 0) scale(1.04, 0.98) rotate(-8deg); }
+  to { transform: translate3d(6%, 7%, 0) scale(0.94, 1.09) rotate(9deg); }
+}
+
+@keyframes ambient-indigo {
+  from { transform: translate3d(4%, 3%, 0) scale(1.05, 0.92) rotate(5deg); }
+  to { transform: translate3d(-8%, -7%, 0) scale(0.93, 1.08) rotate(-12deg); }
+}
+
+@keyframes ambient-teal {
+  from { transform: translate3d(-3%, 6%, 0) scale(0.98, 1.08) rotate(-6deg); }
+  to { transform: translate3d(8%, -4%, 0) scale(1.1, 0.95) rotate(14deg); }
+}
+
+.ambient-background[data-paused='true'] .ambient-field {
+  animation-play-state: paused;
+  will-change: auto;
+}
+
+.ambient-background[data-sleeping='true'] {
+  background: #000;
+}
+
+.ambient-background[data-sleeping='true'] .ambient-field,
+.ambient-background[data-sleeping='true']::after {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-field {
+    animation: none;
+    will-change: auto;
+  }
+}
