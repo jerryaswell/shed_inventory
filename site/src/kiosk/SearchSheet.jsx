@@ -1,6 +1,11 @@
 /**
  * Search and browse by hand, for when voice is not the easier way, or the
  * network is down. Big ± buttons for stock, In/Out for tools.
+ *
+ * While the kiosk sleeps the sheet is `suspended`: a modal dialog sits in the
+ * top layer, above anything the page can stack over it, so the screensaver
+ * cannot cover it. The dialog is closed instead, and stays mounted, so the
+ * search and the list are as they were when it opens again on waking.
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { X, Minus, Plus, Search, Undo2 } from 'lucide-react';
@@ -8,11 +13,12 @@ import { byArea, describeStock, isLow, search } from '../core/inventory.js';
 import { useFocusRescue } from './useFocusRescue.js';
 import './SearchSheet.css';
 
-export default function SearchSheet({ items, onClose, onChange, notice, undoLeft = 0, onUndo }) {
+export default function SearchSheet({ items, onClose, onChange, notice, undoLeft = 0, onUndo, suspended = false }) {
   const [query, setQuery] = useState('');
   const dialogRef = useRef(null);
   const contentRef = useRef(null);
   const titleRef = useRef(null);
+  const resume = useRef(null);
   const titleId = useId();
   const descriptionId = useId();
   const searchId = useId();
@@ -33,6 +39,25 @@ export default function SearchSheet({ items, onClose, onChange, notice, undoLeft
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
+
+  // Closing the dialog hands focus back to the page and drops the list's
+  // scroll position, so both are kept here and put back when it reopens.
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    if (suspended) {
+      const active = document.activeElement;
+      resume.current = { focus: dialog.contains(active) ? active : null, scroll: contentRef.current.scrollTop };
+      dialog.close();
+      return;
+    }
+    if (!resume.current) return;
+    const { focus, scroll } = resume.current;
+    resume.current = null;
+    dialog.showModal();
+    contentRef.current.scrollTop = scroll;
+    // A control that went away meanwhile (Undo running out) leaves the title.
+    (focus?.isConnected ? focus : titleRef.current).focus({ preventScroll: true });
+  }, [suspended]);
 
   useLayoutEffect(() => {
     const content = contentRef.current;
